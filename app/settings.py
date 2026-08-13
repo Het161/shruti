@@ -68,7 +68,18 @@ class Settings(BaseSettings):
     #
     # Motivating case: "તાપમાન કેટલું છે નિકોલ અમદાવાદમાં?" retrieved at 0.424 — below the 1st
     # percentile — and was answered with Palm Harbor city populations and Nicole Brown Simpson.
-    scope_tau: float | None = Field(default=0.5701, alias="SHRUTI_SCOPE_TAU")
+    # Lowered from 0.5701 after the regression set proved no single threshold can do two jobs.
+    # Measured on the regression cases:
+    #
+    #   highest-scoring nonsense    0.5248  ("the the the the the")
+    #   lowest-scoring real question 0.4877 ("where is the taj mahal located")
+    #
+    # The windows OVERLAP, so tau=0.5701 was refusing legitimate authored questions — Taj Mahal,
+    # "define photosynthesis", "when did world war two end" — to catch gibberish it could not
+    # cleanly separate anyway. Gibberish is now handled by `check_degenerate`, which uses lexical
+    # evidence and separates it perfectly, leaving tau responsible only for the case it is actually
+    # good at: a real question about an entity the corpus has no passage for.
+    scope_tau: float | None = Field(default=0.45, alias="SHRUTI_SCOPE_TAU")
 
     # --- timeouts (milliseconds) -----------------------------------------------------
     # Every external call is bounded. On breach the pipeline degrades to a lower tier and logs the

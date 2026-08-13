@@ -48,11 +48,46 @@ from app.stages.lexical import tokenize
 # intrusion tooling — rather than topic keywords. A corpus question about the history of explosives
 # is legitimate; a request for a synthesis procedure is not, and the distinction is the verb.
 _UNSAFE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\b(how|steps?|guide|instructions?)\b.{0,40}\b(make|build|synthesi[sz]e|manufacture)\b.{0,40}\b(bomb|explosive|nerve agent|sarin|ricin|meth|methamphetamine|fentanyl)\b", re.I), "weapons or controlled-substance synthesis"),
-    (re.compile(r"\b(kill|murder|poison|harm)\b.{0,30}\b(someone|person|my|him|her|them)\b", re.I), "violence against a person"),
-    (re.compile(r"\b(child|minor|underage)\b.{0,25}\b(sexual|porn|explicit|nude)\b", re.I), "child sexual content"),
-    (re.compile(r"\b(hack|ddos|exploit|ransomware|keylogger)\b.{0,40}\b(into|against|deploy|write|build)\b", re.I), "intrusion or malware tooling"),
-    (re.compile(r"\b(how|best way)\b.{0,30}\b(kill myself|commit suicide|end my life)\b", re.I), "self-harm"),
+    # --- weapons / controlled substances ---
+    (re.compile(r"\b(how|steps?|guide|instructions?|way)\b.{0,40}\b(make|build|synthesi[sz]e|manufacture|create)\b.{0,40}\b(bomb|explosive|nerve agent|sarin|ricin|meth|methamphetamine|fentanyl|napalm|thermite)\b", re.I), "weapons or controlled-substance synthesis"),
+    (re.compile(r"\b(बम|विस्फोटक)\b.{0,25}(कैसे|बनाऊ|बनाए)", re.I), "weapons or controlled-substance synthesis"),
+    (re.compile(r"(બોમ્બ|વિસ્ફોટક).{0,25}(કેવી રીતે|બનાવ)", re.I), "weapons or controlled-substance synthesis"),
+
+    # --- violence against a person ---
+    # The English rule no longer demands a separate object word: "how to hurt people" and "how do I
+    # kill someone" both have to trip it.
+    (re.compile(r"\b(kill|murder|poison|hurt|harm|attack|stab|shoot)\b\s+(someone|somebody|a person|people|my |him|her|them|his |their )", re.I), "violence against a person"),
+    (re.compile(r"\bhow (do i|to|can i)\b.{0,20}\b(kill|murder|poison|hurt|harm)\b", re.I), "violence against a person"),
+    # Indic: match the *intent* construction, not the bare noun. "नुकसान" alone means damage/loss
+    # and appears throughout the corpus in legal and medical passages — gating on it would refuse
+    # legitimate questions about car-accident damages, which is exactly what the corpus contains.
+    (re.compile(r"(किसी को|किसीको).{0,20}(नुकसान|चोट|हानि).{0,12}(पहुंचा|पहुँचा|कैसे)|(नुकसान|चोट).{0,10}(पहुंचाऊं|पहुँचाऊं|पहुंचाना)", re.I), "violence against a person"),
+    (re.compile(r"(किसी को|किसीको).{0,15}(मार|कत्ल|जान से)", re.I), "violence against a person"),
+    (re.compile(r"(કોઈને).{0,20}(નુકસાન|ઈજા).{0,12}(પહોંચાડ|કેવી રીતે)|(કોઈને).{0,15}(મારવ|મારી)", re.I), "violence against a person"),
+    (re.compile(r"(কাউকে).{0,20}(ক্ষতি|আঘাত).{0,12}(করব|কিভাবে)|(কাউকে).{0,15}(মার|খুন)", re.I), "violence against a person"),
+    (re.compile(r"(யாரையாவது|ஒருவரை).{0,20}(கொல்ல|காயப்படுத்த|தீங்கு)", re.I), "violence against a person"),
+
+    # --- CSAM ---
+    (re.compile(r"\b(child|minor|underage|teen)\b.{0,25}\b(sexual|porn|explicit|nude|naked)\b", re.I), "child sexual content"),
+
+    # --- intrusion / account takeover ---
+    # Previously required a second verb ("hack ... into"), so "how to hack a bank account" sailed
+    # through. Now the target noun alone is enough, which is what the request actually is.
+    (re.compile(r"\b(hack|hacking|crack|breach|break into|bypass)\b.{0,25}\b(account|bank|password|wi-?fi|email|phone|database|server|someone|system|login)\b", re.I), "intrusion or account takeover"),
+    (re.compile(r"\b(ddos|ransomware|keylogger|rootkit|botnet|phishing (kit|page|site))\b", re.I), "malware or attack tooling"),
+    (re.compile(r"\b(steal|stealing)\b.{0,20}\b(password|credit card|identity|data|account)\b", re.I), "credential or identity theft"),
+    (re.compile(r"(हैक|हैकिंग).{0,20}(खाता|अकाउंट|पासवर्ड|कैसे)", re.I), "intrusion or account takeover"),
+
+    # --- doxxing / private personal data about a third party ---
+    (re.compile(r"\b(someone'?s|somebody'?s|his|her|their|a person'?s)\s+(private|home|personal|residential)\s*(address|number|phone|details|information)\b", re.I), "private personal information about a third party"),
+    (re.compile(r"\b(give|find|get|tell)\s+me\b.{0,25}\b(private|home)\s+address\b", re.I), "private personal information about a third party"),
+    (re.compile(r"\b(find|track|locate)\b.{0,20}\b(someone'?s|his|her|their)\s+(location|address|phone)\b", re.I), "private personal information about a third party"),
+    (re.compile(r"\b(social security number|ssn|aadhaar number|credit card number)\b.{0,25}\b(of|for)\b", re.I), "private personal information about a third party"),
+
+    # --- self-harm ---
+    (re.compile(r"\b(how|best way|easiest way)\b.{0,30}\b(kill myself|commit suicide|end my life|hurt myself)\b", re.I), "self-harm"),
+    (re.compile(r"\b(kill myself|commit suicide|end my life)\b", re.I), "self-harm"),
+    (re.compile(r"आत्महत्या.{0,15}(कैसे|तरीका)", re.I), "self-harm"),
 )
 
 # --- conversational intent ------------------------------------------------------------------
@@ -103,6 +138,30 @@ _CONVERSATIONAL: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(call|text|email|order|book|play|buy|send|delete|shut down|turn off|set)\s+(me|my|an?\s|the\s)", re.I), "a command, not a question"),
     (re.compile(r"\b(sing|tell)\s+me\s+(a|an|the)\b", re.I), "a command, not a question"),
     (re.compile(r"\bset an alarm\b|\bremind me\b|\bwrite me\b", re.I), "a command, not a question"),
+    # Romanised Hindi/Gujarati possessives. Voice input from Indian users is frequently romanised,
+    # and a gate that only reads native script misses half its traffic.
+    (re.compile(r"\b(mera|meri|mere)\s+(naam|exam|ghar|phone|account|password|hackathon|interview|order|booking)\b", re.I), "personal information about the speaker"),
+    (re.compile(r"\b(what|how)\s+did\s+i\b|\bhow was my\b|\bwhen is my\b", re.I), "personal information about the speaker"),
+    (re.compile(r"\bmy\s+(exam|interview|meeting|flight|hackathon|order|booking|schedule|homework)\b", re.I), "personal information about the speaker"),
+    (re.compile(r"मेरा\s+(अगला|पिछला)|मेरी\s+(परीक्षा|फ्लाइट)|मेरा\s+(एग्जाम|हैकाथॉन|इंटरव्यू)", re.I), "personal information about the speaker"),
+    # Nearby / here — a static corpus has no location context for the speaker.
+    (re.compile(r"\bnearest\b|\bnear me\b|\bclosest\b.{0,15}\b(to me|here)\b|\baas ?paas\b|\bkaha hai\b", re.I), "a request about the speaker's surroundings"),
+
+    # --- current world state, beyond a static corpus ---
+    # Years at or after 2020 are past MS MARCO's collection window entirely, which makes this a
+    # rare high-precision signal: no passage in the corpus can speak to them.
+    (re.compile(r"\b(20[2-9]\d|21\d\d)\b", re.I), "an event after this corpus was collected"),
+    (re.compile(r"\b(last|this|next)\s+(week|month|night|year)\b|\byesterday\b|\btomorrow\b|\bright now\b|\bcurrently\b|\bat the moment\b", re.I), "a question about current events or the present moment"),
+    (re.compile(r"\b(latest|newest|most recent)\b", re.I), "a question about current events or the present moment"),
+    # No `\b` on Indic tokens. Many of these words end in a combining vowel sign (Unicode category
+    # Mn), which Python's `\w` does not match — so `\bઅત્યારે\b` finds no boundary after the final
+    # sign and silently never fires. It is the same defect as the `আমার মা` prefix bug earlier in
+    # this file, reintroduced by writing these patterns in the habitual ASCII style. Verified:
+    # `\bઅત્યારે\b.{0,14}હવામાન` does not match "અમદાવાદ માં અત્યારે હવામાન કેવું છે"; without the
+    # `\b` it does.
+    (re.compile(r"आज.{0,12}(सेंसेक्स|कीमत|भाव|मौसम)|अभी.{0,12}(कितना|क्या)|पिछले\s+(हफ्ते|सप्ताह)", re.I), "a question about current events or the present moment"),
+    (re.compile(r"અત્યારે.{0,16}(હવામાન|કિંમત|ભાવ|તાપમાન)|આજે.{0,14}(સેન્સેક્સ|ભાવ|હવામાન)", re.I), "a question about current events or the present moment"),
+    (re.compile(r"\baaj\b.{0,14}\b(sensex|nifty|price|weather|mausam)\b|\babhi\b.{0,12}\b(kitna|kya)\b", re.I), "a question about current events or the present moment"),
     (re.compile(r"ऑर्डर करो|फोन करो|गाना गाओ|चुटकुला सुनाओ", re.I), "a command, not a question"),
     (re.compile(r"ઓર્ડર કરો|ફોન કરો|ગીત ગાઓ|જોક કહો", re.I), "a command, not a question"),
     (re.compile(r"অর্ডার করো|ফোন করো|গান গাও|কৌতুক বলো", re.I), "a command, not a question"),
@@ -151,6 +210,53 @@ def check_safety(text: str) -> GuardVerdict:
                 gate=Gate.SAFETY,
                 reason=f"Request matched an unsafe-content pattern: {reason}.",
             )
+    return GuardVerdict(allowed=True)
+
+
+def check_degenerate(text: str, lexical_hits: int) -> GuardVerdict:
+    """Refuse input with no usable lexical content at all.
+
+    This exists because a cosine threshold provably cannot do the job. Measured against the
+    regression set, the highest-scoring nonsense input ("the the the the the", 0.5248) outranks the
+    lowest-scoring legitimate question ("where is the taj mahal located", 0.4877) — the windows
+    overlap, so **no** value of tau both refuses gibberish and answers a Taj Mahal question.
+
+    Lexical evidence separates them cleanly where similarity cannot:
+
+    - `tokenize()` returning nothing means the input was punctuation or stopwords only —
+      "।।।।।।" and "the the the the the" both collapse to zero content tokens.
+    - BM25 returning nothing means not one query term appears anywhere in 310k passages, which for
+      real questions essentially never happens. "asdf qwerty zxcv" is out-of-vocabulary by
+      construction; "what is inflation" is not.
+
+    A dense retriever will always return its nearest neighbours no matter how meaningless the
+    query, because every vector has a nearest vector. Absence of lexical evidence is the signal
+    that the input was never language about this corpus in the first place.
+    """
+    if not tokenize(text):
+        return GuardVerdict(
+            allowed=False,
+            gate=Gate.SCOPE,
+            reason="No searchable content in that input — it is punctuation or common words only.",
+        )
+    # Digits alone are not a question. `str.isnumeric()` is Unicode-aware, so this covers Gujarati
+    # ૧૨૩૪૫૬ and Devanagari १२३४५६ as well as ASCII — which matters, because a bare numeral string
+    # does produce BM25 hits (the corpus is full of statute and ZIP-code numbers) and so slips
+    # past the no-lexical-evidence check below.
+    stripped = "".join(ch for ch in text if not ch.isspace() and ch.isalnum())
+    if stripped and stripped.isnumeric():
+        return GuardVerdict(
+            allowed=False,
+            gate=Gate.SCOPE,
+            reason="That is a number with no question attached — there is nothing to look up.",
+        )
+    if lexical_hits == 0:
+        return GuardVerdict(
+            allowed=False,
+            gate=Gate.SCOPE,
+            reason="None of those words appear anywhere in the corpus, so there is nothing to "
+            "answer from.",
+        )
     return GuardVerdict(allowed=True)
 
 

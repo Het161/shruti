@@ -61,6 +61,9 @@ class RetrievalResult:
     top_dense_score: float | None
     detected_lang: str
     searched_langs: list[str]
+    # Number of BM25 hits. Carried so the degenerate-input gate can distinguish "no lexical
+    # evidence anywhere in the corpus" from "weak but present evidence" without re-running search.
+    lexical_hits: int
     # Carried forward so the extractive stage reuses it. Re-embedding the same query a second time
     # would be pure waste on the one path where every millisecond is the product.
     query_vec: np.ndarray
@@ -156,6 +159,7 @@ class Pipeline:
             top_dense_score=top_dense,
             detected_lang=detected,
             searched_langs=langs,
+            lexical_hits=int(lex_rows.size),
             query_vec=query_vec,
         )
 
@@ -263,7 +267,11 @@ class Pipeline:
         )
 
         with timer.stage("guard_scope"):
-            scope = guards.check_scope(result.top_dense_score, self.settings.scope_tau)
+            # Degenerate-input check first: it uses lexical evidence, which separates gibberish
+            # from real questions where the cosine threshold demonstrably cannot.
+            scope = guards.check_degenerate(req.text, result.lexical_hits)
+            if scope.allowed:
+                scope = guards.check_scope(result.top_dense_score, self.settings.scope_tau)
 
         passages = self._to_scored(result.hits[:top_n])
 
