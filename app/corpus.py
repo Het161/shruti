@@ -95,6 +95,32 @@ class Corpus:
         self.lang_rows: dict[str, np.ndarray] = {
             k: np.asarray(v, dtype=np.int64) for k, v in by_lang.items()
         }
+        # Boolean masks alongside the row-index arrays. Exact search filters by masking a full
+        # score vector rather than by fancy-indexing the embedding matrix: `emb[rows]` would
+        # materialise a fresh ~200 MB copy on every query, which costs far more than the search
+        # itself. A bool mask is one byte per passage and the matmul happens anyway.
+        self.lang_mask: dict[str, np.ndarray] = {}
+        for k, rows in self.lang_rows.items():
+            mask = np.zeros(self.n_passages, dtype=bool)
+            mask[rows] = True
+            self.lang_mask[k] = mask
+
+    def rows_for_langs(self, langs: list[str]) -> np.ndarray | None:
+        """Row indices for the union of `langs`. `None` means no restriction."""
+        present = [self.lang_rows[lg] for lg in langs if lg in self.lang_rows]
+        if not present or len(present) == len(self.lang_rows):
+            return None
+        return np.concatenate(present)
+
+    def mask_for_langs(self, langs: list[str]) -> np.ndarray | None:
+        """Boolean mask for the union of `langs`. `None` means no restriction."""
+        present = [self.lang_mask[lg] for lg in langs if lg in self.lang_mask]
+        if not present or len(present) == len(self.lang_mask):
+            return None
+        out = present[0].copy()
+        for m in present[1:]:
+            out |= m
+        return out
 
     # -- loading ------------------------------------------------------------------------
 
@@ -178,7 +204,7 @@ class Corpus:
     # -- exact search -------------------------------------------------------------------
 
     def exact_search(
-        self, query_vec: np.ndarray, k: int, restrict: np.ndarray | None = None
+        self, query_vec: np.ndarray, k: int, mask: np.ndarray | None = None
     ) -> tuple[np.ndarray, np.ndarray]:
         """Brute-force cosine search. Returns `(rows, scores)` sorted descending.
 
@@ -186,15 +212,17 @@ class Corpus:
         a few milliseconds, so it is a genuine runtime option rather than a debug-only path — and
         having both means the recall cost of approximate search is a measured number, not an
         assumption.
+
+        `mask` restricts the search to selected rows. It is applied to the *scores* rather than to
+        the embedding matrix: slicing `emb[rows]` would copy hundreds of megabytes per query, while
+        masking a float32 score vector costs a few hundred microseconds over memory we had to touch
+        regardless.
         """
         emb = self.embeddings
         q = np.ascontiguousarray(query_vec, dtype=np.float32)
 
-        if restrict is not None:
-            emb = emb[restrict]
-
         if emb.dtype == np.float32:
-            scores = emb @ q
+            scores = np.asarray(emb @ q, dtype=np.float32)
         else:
             # int8 path: widen block by block so the temporary never exceeds one chunk.
             scores = np.empty(emb.shape[0], dtype=np.float32)
@@ -203,12 +231,19 @@ class Corpus:
                 block *= self.quant_scale
                 scores[start : start + block.shape[0]] = block @ q
 
-        k = min(k, scores.shape[0])
+        if mask is not None:
+            # -inf rather than 0: cosine similarity is legitimately negative, and zeroing would
+            # rank an excluded passage above a genuinely dissimilar included one.
+            scores = np.where(mask, scores, -np.inf)
+            available = int(mask.sum())
+        else:
+            available = scores.shape[0]
+
+        k = min(k, available)
         if k == 0:
             return np.empty(0, dtype=np.int64), np.empty(0, dtype=np.float32)
 
         # argpartition is O(n) against argsort's O(n log n); only the top-k slice is then sorted.
         top = np.argpartition(-scores, k - 1)[:k]
         top = top[np.argsort(-scores[top])]
-        rows = restrict[top] if restrict is not None else top
-        return rows.astype(np.int64), scores[top].astype(np.float32)
+        return top.astype(np.int64), scores[top].astype(np.float32)

@@ -85,6 +85,36 @@ MIN_PASSAGE_CHARS = 20
 MAX_PASSAGE_CHARS = 4000
 FLUSH_EVERY = 20_000
 
+# Translation-degeneration filter.
+#
+# MSMARCO-XI is machine-translated, and neural MT degenerates on short or ambiguous inputs by
+# looping a phrase. Measured on a 400-query Hindi sample: the English query "suit definition"
+# (15 chars) became a 7,783-character Hindi string repeating one clause ~90 times.
+#
+# Prevalence, measured rather than assumed:
+#
+#   threshold   passages        queries
+#   > 0.3       4.22%           0.25%
+#   > 0.5       0.11%           0.25%
+#   > 0.7       0.00%           0.25%
+#
+# 0.5 is the chosen cut. At 0.3 the filter starts eating legitimate repetitive text — enumerations,
+# tables, boilerplate — which is why the looser threshold flags 40× more passages while catching no
+# additional queries. Degenerate text is poison for retrieval specifically: repeated n-grams inflate
+# BM25 term frequencies and drag the embedding toward the repeated phrase, so these passages
+# retrieve for far more queries than they deserve.
+MAX_REPETITION_RATIO = 0.5
+_REP_NGRAM = 5
+
+
+def repetition_ratio(text: str, n: int = _REP_NGRAM) -> float:
+    """Fraction of word n-grams that are repeats. 0.0 = all distinct, ~1.0 = a loop."""
+    tokens = text.split()
+    if len(tokens) < 2 * n:
+        return 0.0
+    grams = [tuple(tokens[i : i + n]) for i in range(len(tokens) - n + 1)]
+    return 1.0 - len(set(grams)) / len(grams)
+
 _WS = re.compile(r"\s+")
 
 log = logging.getLogger("build_corpus")
@@ -159,6 +189,11 @@ QUERY_SCHEMA = pa.schema(
         ("query_type", pa.string()),
         ("eng_query", pa.string()),
         ("eng_answer", pa.string()),
+        # Flagged rather than dropped: the query's passages are still valid corpus content and its
+        # qrels still describe real relevance. Only the query *text* is unusable, so the benchmark
+        # and the chunking lab filter on this column instead of the row vanishing and silently
+        # breaking joins.
+        ("degenerate", pa.bool_()),
     ]
 )
 
@@ -219,6 +254,8 @@ class BuildStats:
     passages_kept: int = 0
     passages_deduped: int = 0
     passages_filtered: int = 0
+    passages_degenerate: int = 0
+    queries_degenerate: int = 0
     per_lang_kept: dict[str, int] = field(default_factory=dict)
 
     def as_dict(self) -> dict[str, Any]:
@@ -228,6 +265,8 @@ class BuildStats:
             "passages_kept": self.passages_kept,
             "passages_deduped": self.passages_deduped,
             "passages_filtered": self.passages_filtered,
+            "passages_degenerate": self.passages_degenerate,
+            "queries_degenerate": self.queries_degenerate,
             "per_lang_kept": self.per_lang_kept,
         }
 
@@ -292,6 +331,9 @@ def build(
         if not (MIN_PASSAGE_CHARS <= len(text) <= MAX_PASSAGE_CHARS):
             stats.passages_filtered += 1
             return
+        if repetition_ratio(text) > MAX_REPETITION_RATIO:
+            stats.passages_degenerate += 1
+            return
 
         pid = content_id(text)
         qrels.add(
@@ -345,15 +387,21 @@ def build(
                     english = pas.get("English_passages") or []
                     selected = pas.get("is_selected") or []
 
+                    query_text = normalize(row.get("query") or "")
+                    is_degenerate = repetition_ratio(query_text) > MAX_REPETITION_RATIO
+                    if is_degenerate:
+                        stats.queries_degenerate += 1
+
                     queries.add(
                         {
                             "query_id": qid,
                             "lang": lang,
-                            "query": normalize(row.get("query") or ""),
+                            "query": query_text,
                             "answer": normalize(row.get("Answer") or ""),
                             "query_type": qtype,
                             "eng_query": normalize(row.get("Eng_Query") or ""),
                             "eng_answer": normalize(row.get("Eng_Answer") or ""),
+                            "degenerate": is_degenerate,
                         }
                     )
 
@@ -440,7 +488,9 @@ def main() -> int:
     log.info("  passages seen     %d", stats.passages_seen)
     log.info("  passages kept     %d", stats.passages_kept)
     log.info("  deduped           %d (%.1f%%)", stats.passages_deduped, 100 * dedupe_rate)
-    log.info("  filtered          %d", stats.passages_filtered)
+    log.info("  filtered (length) %d", stats.passages_filtered)
+    log.info("  filtered (degen)  %d", stats.passages_degenerate)
+    log.info("  degenerate queries %d (flagged, not dropped)", stats.queries_degenerate)
     for lang, n in sorted(stats.per_lang_kept.items()):
         log.info("  %-3s %d", lang, n)
     log.info("output -> %s", args.out)
