@@ -187,6 +187,10 @@ class AskRequest(BaseModel):
     search_mode: Literal["hnsw", "exact"] | None = None
     top_n: int | None = Field(default=None, ge=1, le=20)
     generate: bool = Field(default=False, description="Request Tier 2; Tier 1 returns regardless")
+    # Per-request so the trade-off is demonstrable without a redeploy. Only meaningful alongside
+    # `generate`, because reranking runs in the Tier 2 lane — it costs ~561ms at depth 10, which is
+    # 2.8x the entire Tier 1 answer SLO and therefore cannot precede the guaranteed answer.
+    rerank: bool | None = Field(default=None, description="Rerank Tier 2 context (Tier 2 only)")
 
 
 class AskResponse(BaseModel):

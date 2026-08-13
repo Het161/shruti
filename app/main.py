@@ -233,6 +233,20 @@ async def ask(req: AskRequest) -> AskResponse:
             status_code=503,
             detail=f"index not loaded: {state.load_error or 'still starting'}",
         )
+    settings = get_settings()
+    want_rerank = (settings.rerank_enabled if req.rerank is None else req.rerank) and req.generate
+
+    # Widen the candidate set BEFORE retrieval when reranking is requested.
+    #
+    # This was a real bug caught on the deployed service: `context_top_n` is 3, so the reranker was
+    # handed 3 passages and could only permute them — 193ms spent to reorder a list whose contents
+    # were already fixed. The measured +60% MRR comes from reranking the top-10 fused candidates
+    # and *then* keeping 3; the gain is in promoting a passage that would otherwise have been cut,
+    # which is impossible if the cut already happened.
+    final_top_n = req.top_n or settings.context_top_n
+    if want_rerank:
+        req = req.model_copy(update={"top_n": max(final_top_n, settings.rerank_depth)})
+
     try:
         timer = RequestTimer()
         result = state.pipeline.ask(req, timer)
@@ -247,13 +261,10 @@ async def ask(req: AskRequest) -> AskResponse:
     # Tier 2 is opt-in and strictly additive. The benchmark harness leaves it off, so published
     # pipeline percentiles measure the guaranteed path rather than a provider's mood that second.
     if req.generate and state.chain is not None and result.answer is not None:
-        settings = get_settings()
-
-        # Rerank the Tier 1 passages before generating from them — inside the Tier 2 lane, never
-        # before Tier 1 was served. The measured cost (561ms at depth 10) is 2.8x the whole answer
-        # SLO, so its only defensible home is here, where Tier 1 has already reached the user and
-        # this cost shows up as "full answer time" instead.
-        if settings.rerank_enabled and len(result.passages) > 1:
+        # Rerank inside the Tier 2 lane, never before Tier 1 was served. The measured cost (561ms
+        # at depth 10) is 2.8x the whole answer SLO, so this is its only defensible home — Tier 1
+        # has already reached the user and this shows up as "full answer time" instead.
+        if want_rerank and len(result.passages) > 1:
             try:
                 from app.stages.rerank import get_reranker
 
@@ -261,7 +272,9 @@ async def ask(req: AskRequest) -> AskResponse:
                 out = reranker.rerank(
                     req.text, [p.passage.text for p in result.passages], settings.rerank_depth
                 )
-                result.passages = [result.passages[i] for i in out.order]
+                # Reorder the widened set, then cut to what the caller actually asked for. The
+                # promotion of a passage from rank 7 into the final 3 is the entire point.
+                result.passages = [result.passages[i] for i in out.order][:final_top_n]
                 result.timings.stages.append(
                     StageTiming(
                         name="rerank",
@@ -271,6 +284,9 @@ async def ask(req: AskRequest) -> AskResponse:
                 )
             except Exception as e:
                 log.warning("rerank skipped: %s", e)
+        elif len(result.passages) > final_top_n:
+            # Not reranking: undo the widening so the response matches the request.
+            result.passages = result.passages[:final_top_n]
 
         stream = None
         async for event, partial in generate_streaming(

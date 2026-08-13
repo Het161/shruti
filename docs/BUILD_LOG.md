@@ -545,3 +545,82 @@ and the robustness edge cases.
 The three false refusals are edge cases and all are visible: a question about the history of
 suicide-prevention research, a song lyric containing "मेरा नाम", and "is there an option to change
 your name". At 1 in 2,000 that is an acceptable price for 100% guardrail coverage.
+
+---
+
+## Precision: three options measured, one shipped
+
+Prompted by a correction worth recording: the reranker recommendation was made from an
+accuracy-only view, and in this task accuracy is in tension with latency. The other two options
+were measured rather than dropped, because rejecting with evidence is the artifact.
+
+### 1. Cross-encoder reranker — SHIPPED (Tier 2 only)
+
+`jina-reranker-v2-base-multilingual`, int8 ONNX. Chosen over `bge-reranker-base` because the latter
+is predominantly English/Chinese and this corpus is Gujarati, Hindi, Bengali, Tamil and English —
+a reranker that cannot read the query is worse than none.
+
+| config | MRR@10 | ΔMRR | rerank p50 | rerank p100 |
+|---|---|---|---|---|
+| baseline | 0.1954 | — | — | — |
+| top-10 | 0.3127 | **+60.0%** | 561ms | 940ms |
+| top-20 | 0.3903 | **+99.8%** | 1335ms | 2088ms |
+| top-50 | 0.4228 | **+116.4%** | 4073ms | 5200ms |
+
+The largest single retrieval gain measured in this project — and structurally excluded from the
+Tier 1 path, because even depth 10 is **2.8x the entire 200ms answer SLO** against a Tier 1 that
+completes in ~20ms. It runs in the Tier 2 lane, after the guaranteed answer has shipped.
+
+A microbenchmark on short synthetic passages had reported 122ms at depth 10. Real 59-word corpus
+passages cost **561ms** — 4.6x more. Trusting the first number would have put this on the critical
+path and broken the headline claim silently.
+
+Two bugs found only by deploying it:
+
+- The reranker was being handed **3** passages, not 10, because `context_top_n` is 3 — so it spent
+  193ms permuting a list whose contents were already decided. The measured gain comes from
+  reranking the top-10 and *then* cutting to 3; promoting a passage from rank 7 into the final
+  three is the entire mechanism, and it is impossible if the cut already happened. Fixed by
+  widening the candidate set before retrieval and truncating after.
+- It was only togglable by redeploying, so the trade-off could not be demonstrated. Now a
+  per-request `rerank` flag alongside `lane` and `search_mode`.
+
+Observed on the deployed service, same question: the generative answer went from
+`grounded: false` to `grounded: true` once the context was reranked.
+
+### 2. 384-dim quality lane (e5-small) — REJECTED on cost
+
+| encoder | embed 20,000 passages | throughput |
+|---|---|---|
+| potion (static, shipped) | **1.9s** | 10,720/s |
+| e5-small (ONNX int8) | >25 min, killed unfinished | ~15/s |
+
+Extrapolated to the real 310,582-passage corpus: potion **22 seconds**, e5 **~5.7 hours**. Even at
+four threads instead of one that is ~1.4 hours, plus a second 477 MB matrix, a larger container,
+and doubled memory on every deploy.
+
+The MRR half of this experiment was never obtained — the run was killed after 25 minutes. That is
+the honest state, and it does not change the decision: the cost side alone disqualifies the lane
+against a six-day deadline. Chasing the quality number would have made the table symmetrical
+without making the answer different.
+
+The lane remains in the code, disabled, returning a 400 that names the dimension mismatch.
+
+### 3. Corpus shrink — MEASURED, not taken
+
+| index size | MRR@10 | vs 6k |
+|---|---|---|
+| 6,259 | 0.1843 | — |
+| 16,259 | 0.1572 | −14.7% |
+| 36,259 | 0.1275 | −30.8% |
+| 106,259 | 0.0931 | −49.5% |
+| 310,582 | 0.0732 | **−60.3%** |
+
+Precision falls monotonically with corpus size, ~15–20% per 3x. This is specific to how the corpus
+is built: sampling is by `query_id`, so every indexed query already has all its relevant passages
+and additional passages are pure distractors competing for the same top-10 slots.
+
+A 30–50k index would roughly double MRR. It is not taken, because a demo that cannot answer a
+judge's question is worse than one that answers it at rank 3 instead of rank 1 — coverage is the
+product, precision is the metric. The reranker recovers most of the gap without giving up either,
+which is why it was the right one of the three to build.
