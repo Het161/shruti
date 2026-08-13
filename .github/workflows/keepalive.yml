@@ -1,15 +1,22 @@
 name: keepalive
 
-# Cloud Run scales to zero, which means the first request after an idle period pays container
-# start plus model load plus warmup. A judge opening the link should not be the one to pay that.
+# This is a HEALTH CHECK, not a warm-keeper. The distinction matters and it changed once the
+# hosting economics were worked out honestly.
 #
-# This pings every 30 minutes purely to keep an instance resident. It is explicitly NOT a latency
-# measurement — cold start is measured separately and reported as its own number in the benchmark
-# artifact, never blended into per-query latency.
+# The deployment scales to zero. A ping only keeps a container warm if the scaledown window
+# outlasts the ping interval — at which point the container never scales down and costs exactly
+# what pinning it costs. There is no free middle ground, so pretending a cron job is a
+# cost-free warmer would be self-deception.
+#
+# Warming is therefore a deliberate act before the demo:
+#     MIN_CONTAINERS=1 modal deploy deploy/modal_app.py
+#
+# This job just verifies the service still answers, every 6 hours. Cold start is measured and
+# reported as its own number in the benchmark artifact, never blended into query latency.
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 jobs:

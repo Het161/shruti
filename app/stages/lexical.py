@@ -63,7 +63,7 @@ def tokenize(text: str) -> list[str]:
 
 
 class LexicalIndex:
-    """BM25 over the corpus. Built offline, memory-mapped at startup."""
+    """BM25 over the corpus. Built offline, loaded into RAM at startup."""
 
     def __init__(self, retriever: object, n_docs: int) -> None:
         self._retriever = retriever
@@ -87,7 +87,12 @@ class LexicalIndex:
     def load(cls, path: str, n_docs: int) -> LexicalIndex:
         import bm25s
 
-        retriever = bm25s.BM25.load(path, mmap=True)
+        # mmap=False for the same reason the embedding matrix and the HNSW graph are RAM-resident:
+        # a mapped index takes first-touch page faults at unpredictable points and produces exactly
+        # the tail outliers this system exists to avoid. Caught on the deployed service, where a
+        # cold BM25 stage measured 14.4ms against a 1-2ms warm P50 — the last mmap left in the
+        # retrieval path, and it was still costing the largest single slice of a query.
+        retriever = bm25s.BM25.load(path, mmap=False)
         return cls(retriever, n_docs)
 
     def search(self, query: str, k: int) -> tuple[np.ndarray, np.ndarray]:
