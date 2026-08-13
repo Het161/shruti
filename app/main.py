@@ -37,7 +37,7 @@ from app.providers.llm import ProviderChain, build_chain
 from app.providers.sarvam_ws import SarvamStream, SpeechEvent, Transcript
 from app.schemas import AskRequest, AskResponse, HealthResponse
 from app.settings import get_settings
-from app.stages.base import StageError
+from app.stages.base import ErrorKind, StageError
 from app.stages.dense import DenseIndex
 from app.stages.generate import finalize, generate_streaming
 from app.stages.lexical import LexicalIndex
@@ -238,7 +238,11 @@ async def ask(req: AskRequest) -> AskResponse:
         result = state.pipeline.ask(req, timer)
     except StageError as e:
         log.warning("stage error: %s", e)
-        raise HTTPException(status_code=500, detail=e.as_dict()) from e
+        # A caller asking for something this deployment cannot serve is a 400, not a 500. The
+        # distinction matters operationally: 500s should mean "we are broken", and a lane/corpus
+        # dimension mismatch means "that request was not valid here".
+        status = 400 if e.kind is ErrorKind.INVALID_INPUT else 500
+        raise HTTPException(status_code=status, detail=e.as_dict()) from e
 
     # Tier 2 is opt-in and strictly additive. The benchmark harness leaves it off, so published
     # pipeline percentiles measure the guaranteed path rather than a provider's mood that second.

@@ -126,7 +126,22 @@ button.mic { background: transparent; color: var(--ink); border-color: var(--rul
 button.mic:hover:not(:disabled) { background: transparent; border-color: var(--trace); color: var(--trace); }
 button.mic[data-recording="true"] { border-color: var(--refuse); color: var(--refuse); background: var(--refuse-wash); }
 
-.toggles { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 12px; }
+/* Sample-query chips. Script-native labels so the language is identifiable at a glance without
+   reading the query itself, and the two refusal chips are tinted so the "knows when not to
+   answer" path is visibly a first-class thing to try, not an easter egg. */
+.samples { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 12px; }
+.chip {
+  font-family: var(--sans); font-size: 12.5px; letter-spacing: 0; text-transform: none;
+  background: transparent; color: var(--ink);
+  border: 1px solid var(--rule-strong); border-radius: 999px;
+  padding: 4px 12px; cursor: pointer; line-height: 1.5;
+}
+.chip:hover { border-color: var(--trace); color: var(--trace); background: var(--trace-wash); }
+.chip[data-kind="refuse"], .chip[data-kind="ood"] { color: var(--refuse); border-color: color-mix(in srgb, var(--refuse) 40%, transparent); }
+.chip[data-kind="refuse"]:hover, .chip[data-kind="ood"]:hover { background: var(--refuse-wash); border-color: var(--refuse); color: var(--refuse); }
+
+.toggles { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--rule); }
+.toggle select:disabled { opacity: .45; cursor: not-allowed; }
 .toggle { display: flex; align-items: center; gap: 7px; font-family: var(--mono); font-size: 11px; color: var(--dim); letter-spacing: .05em; }
 .toggle select {
   font-family: var(--mono); font-size: 11px; color: var(--ink);
@@ -213,12 +228,13 @@ button.mic[data-recording="true"] { border-color: var(--refuse); color: var(--re
 /* ------------------------------------------------------------------ misc */
 
 .status-strip {
-  display: flex; gap: 16px; flex-wrap: wrap;
   font-family: var(--mono); font-size: 10.5px; color: var(--dim);
-  letter-spacing: .05em; margin-top: 20px;
-  border-top: 1px solid var(--rule); padding-top: 12px;
+  letter-spacing: .04em; line-height: 1.9; margin-top: 18px;
+  border-top: 1px solid var(--rule); padding-top: 11px;
 }
+.status-strip + .status-strip { margin-top: 0; border-top: 0; padding-top: 0; }
 .status-strip b { color: var(--ink); font-weight: 500; }
+.status-strip a { color: var(--trace); }
 
 .hidden { display: none !important; }
 .error { color: var(--refuse); font-family: var(--mono); font-size: 12px; }

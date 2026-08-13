@@ -57,6 +57,11 @@ image = (
         "huggingface-hub>=0.26",
         "httpx>=0.27",
         "websockets>=13",
+        # The quality lane's dependencies. Previously omitted to keep the image small, which meant
+        # the UI shipped a toggle that returned HTTP 500 — a demonstrable trade-off is only
+        # demonstrable if it runs. ~200 MB for a switch the judges can actually flip.
+        "onnxruntime>=1.19",
+        "tokenizers>=0.20",
     )
     # Model weights are baked into the image, not the Volume: they never change, so they belong in
     # a cached layer where they cost nothing on redeploy.

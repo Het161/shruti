@@ -34,11 +34,16 @@
     <canvas class="wave hidden" id="wave" height="46" aria-hidden="true"></canvas>
     <div class="transcript-live hidden" id="live"></div>
 
+    <!-- Sample queries. A judge evaluating this will not type Gujarati or Tamil, and a demo that
+         can only be exercised by someone who speaks the language demos nothing. Each chip is a
+         real query from the indexed corpus, plus two that are deliberately out of scope. -->
+    <div class="samples" id="samples"></div>
+
     <div class="toggles">
       <label class="toggle">Lane
         <select id="lane">
-          <option value="fast">fast · potion static</option>
-          <option value="quality">quality · e5 onnx</option>
+          <option value="fast">fast · potion 256d</option>
+          <option value="quality" disabled>quality · e5 384d — needs 384d corpus</option>
         </select>
       </label>
       <label class="toggle">Search
@@ -89,6 +94,7 @@
   </section>
 
   <div class="status-strip" id="status">connecting…</div>
+  <div class="status-strip" id="status2"></div>
 </div>
 
 <script src="/app.js"></script>

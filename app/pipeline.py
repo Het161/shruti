@@ -109,6 +109,22 @@ class Pipeline:
 
         with timer.stage("embed"):
             embedder = self.embedder_for(lane)
+            # A lane whose dimensionality does not match the indexed corpus cannot search it, and
+            # the failure would otherwise surface as an opaque shape error deep inside a matmul.
+            #
+            # This is a real limitation of the two-lane design, not a bug to paper over: the fast
+            # lane is 256-dim (potion) and the quality lane is 384-dim (e5-small), so switching
+            # lanes at query time requires a *second* corpus embedding at the other width — about
+            # 477 MB and ~26 minutes of e5 forward passes for this corpus. The toggle is honest
+            # about that rather than pretending.
+            if embedder.dim != self.corpus.dim:
+                raise StageError(
+                    "embed",
+                    ErrorKind.INVALID_INPUT,
+                    f"lane '{lane}' produces {embedder.dim}-dim vectors but the corpus is indexed "
+                    f"at {self.corpus.dim} dims. Serving this lane requires a corpus embedded with "
+                    f"the same model; see docs/BUILD_LOG.md.",
+                )
             query_vec = embedder.encode_query(text)
 
         with timer.stage("dense"):

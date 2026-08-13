@@ -37,22 +37,59 @@ async function loadHealth() {
     const r = await fetch("/api/health");
     health = await r.json();
     const p = health.providers || {};
+    /* Joined with an explicit separator. A bare .join("") previously rendered
+     * "310,582 passageslangs bn en gu hi ta" — two facts fused into one unreadable token. */
     $("status").innerHTML = [
       `corpus <b>${health.corpus_passages.toLocaleString()}</b> passages`,
       `langs <b>${(health.corpus_languages || []).join(" ")}</b>`,
       `dim <b>${health.embed_dim}</b>`,
-      `warmup <b>${health.warmup_queries_run}</b> · p50 <b>${
-        health.warmup_p50_ms ? health.warmup_p50_ms.toFixed(2) : "—"
+      `warmup <b>${health.warmup_queries_run}</b> @ <b>${
+        health.warmup_p50_ms ? health.warmup_p50_ms.toFixed(1) : "—"
       }ms</b>`,
       `voice <b>${p.sarvam ? "ready" : "off"}</b>`,
-      `gen <b>${p.cerebras || p.groq ? "ready" : "off"}</b>`,
+      `gen <b>${p.groq || p.cerebras ? "ready" : "off"}</b>`,
       `v<b>${health.version}</b>`,
-    ].join("");
-    if (!health.ready) $("status").innerHTML += ` · <b style="color:var(--refuse)">warming up</b>`;
+    ].join(" &nbsp;·&nbsp; ");
+
+    $("status2").innerHTML = health.ready
+      ? `scope gate <b>uncalibrated</b> &nbsp;·&nbsp; no threshold separates in- from out-of-domain on this corpus without refusing &gt;10% of real queries — see <a href="/method.html" style="color:var(--trace)">Method</a>`
+      : `<b style="color:var(--refuse)">warming up — first query pays model load</b>`;
+
     $("mic").disabled = !p.sarvam;
     if (!p.sarvam) $("mic").title = "Voice unavailable: no Sarvam key configured";
   } catch (e) {
     $("status").innerHTML = `<span class="error">server unreachable — ${e.message}</span>`;
+  }
+}
+
+/* Sample queries — one per indexed language, drawn from the corpus, plus two deliberately
+ * out-of-scope so the refusal path is one click away rather than something a judge has to
+ * think up an example for. */
+const SAMPLES = [
+  { label: "हिन्दी", q: "कॉर्पोरेशन क्या है?", kind: "in" },
+  { label: "ગુજરાતી", q: "કોર્પોરેશન શું છે?", kind: "in" },
+  { label: "বাংলা", q: "কর্পোরেশন কি?", kind: "in" },
+  { label: "தமிழ்", q: "கார்ப்பரேஷன் என்றால் என்ன?", kind: "in" },
+  { label: "English", q: "what is a corporation?", kind: "in" },
+  { label: "unsafe →", q: "how to make a bomb step by step at home", kind: "refuse" },
+  { label: "off-topic →", q: "તમારું નામ શું છે મને કહો", kind: "ood" },
+];
+
+function renderSamples() {
+  const wrap = $("samples");
+  wrap.innerHTML = "";
+  for (const s of SAMPLES) {
+    const b = document.createElement("button");
+    b.className = "chip";
+    b.dataset.kind = s.kind;
+    b.type = "button";
+    b.textContent = s.label;
+    b.title = s.q;
+    b.addEventListener("click", () => {
+      $("q").value = s.q;
+      ask(s.q);
+    });
+    wrap.appendChild(b);
   }
 }
 
@@ -229,10 +266,32 @@ async function ask(text) {
     const clientMs = performance.now() - clientT0;
 
     if (!r.ok) {
-      const body = await r.text();
+      /* Render the error, not the JSON envelope it arrived in. Dumping
+       * {"detail":{"stage":"embed",...}} at a user communicates nothing except that something
+       * broke in a way nobody anticipated. */
+      let stage = "";
+      let message = "";
+      try {
+        const d = (await r.json()).detail;
+        if (d && typeof d === "object") {
+          stage = d.stage || "";
+          message = d.message || "";
+        } else {
+          message = String(d ?? "");
+        }
+      } catch {
+        message = await r.text();
+      }
       $("answer-panel").classList.remove("hidden");
-      setLamp("refused", `http ${r.status}`);
-      $("answer").innerHTML = `<span class="error">${body.slice(0, 300)}</span>`;
+      $("timing-panel").classList.add("hidden");
+      $("passages-panel").classList.add("hidden");
+      setLamp("refused", `error · ${r.status}`);
+      $("tier").textContent = "Request failed";
+      $("answer").textContent = "";
+      $("badges").innerHTML = "";
+      $("refusal").classList.remove("hidden");
+      $("refusal-gate").textContent = stage ? `stage: ${stage}` : `http ${r.status}`;
+      $("refusal-text").textContent = message.slice(0, 400);
       return;
     }
 
@@ -291,6 +350,9 @@ async function startVoice() {
         m.type === "final" ? escapeHtml(m.text) : `<span class="partial">${escapeHtml(m.text)}</span>`;
       if (m.type === "final") {
         $("q").value = m.text;
+        /* Hide the live transcript once it lands in the input. Leaving both visible showed the
+         * same sentence twice, which reads as a rendering bug rather than a feature. */
+        $("live").classList.add("hidden");
         stopVoice();
         ask(m.text);
       }
@@ -358,5 +420,6 @@ $("q").addEventListener("keydown", (e) => {
 });
 $("mic").addEventListener("click", () => (recording ? stopVoice() : startVoice()));
 
+renderSamples();
 loadHealth();
 setInterval(loadHealth, 30000);

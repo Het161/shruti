@@ -115,7 +115,26 @@ class QualityEmbedder:
             ) from e
 
         log.info("loading quality embedder %s", model_id)
-        onnx_path = hf_hub_download(model_id, "onnx/model_int8.onnx")
+
+        # The repo's int8 export is `model_qint8_avx512_vnni.onnx` — quantised for AVX512-VNNI
+        # specifically, which is not present on every CPU (and not on ARM at all). So it is tried
+        # first and fp32 is the fallback, rather than hard-coding either.
+        #
+        # An earlier version of this file requested `onnx/model_int8.onnx`, which does not exist in
+        # the repo at all. That bug was invisible until the lane was actually exercised, because
+        # nothing constructs a QualityEmbedder until someone flips the toggle.
+        onnx_path = None
+        for candidate in ("onnx/model_qint8_avx512_vnni.onnx", "onnx/model.onnx"):
+            try:
+                onnx_path = hf_hub_download(model_id, candidate)
+                log.info("quality lane using %s", candidate)
+                break
+            except Exception as e:
+                log.warning("quality lane: %s unavailable (%s)", candidate, type(e).__name__)
+        if onnx_path is None:
+            raise StageError(
+                "embed", ErrorKind.INTERNAL, f"no usable ONNX export found for {model_id}"
+            )
         tok_path = hf_hub_download(model_id, "tokenizer.json")
 
         opts = ort.SessionOptions()

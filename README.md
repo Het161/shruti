@@ -254,12 +254,52 @@ a hidden branch.
 
 | gate | mechanism |
 |---|---|
-| **scope** | abstention threshold τ on the top **dense cosine** score — not the fused RRF score, which is rank-derived and has no stable cross-query meaning. Calibrated against an out-of-domain probe set; **until calibrated it reports itself uncalibrated rather than applying a guessed number.** |
+| **scope** | abstention threshold τ on the top **dense cosine** score — not the fused RRF score, which is rank-derived and has no stable cross-query meaning. **Calibration was run and the honest result is that no shippable threshold exists — see below.** The gate reports itself uncalibrated in every response rather than applying a number that would break the product. |
 | **safety** | fast pattern screen on the transcript; runs before retrieval so a refusal costs nothing |
 | **grounding** | Tier 1 is grounded by construction. Tier 2 is verified post-hoc by token containment against the passages it cited — not an LLM judge, which would add a round-trip and another chance to be wrong |
 | **injection** | retrieved passages are wrapped as data and never interpolated as instructions; instruction-like passages are flagged inline |
 
 ---
+
+### Scope-gate calibration — a negative result, reported
+
+`lab/calibrate_scope.py` scored 500 in-domain queries against a 70-probe out-of-domain set
+(conversational, assistant-meta, personal-private, actionable-command) across all five languages.
+
+```
+in-domain   p05=0.5639  p50=0.7036  p95=0.8367
+out-domain  p05=0.4968  p50=0.6132  p95=0.7621
+```
+
+The distributions overlap almost entirely. Four candidate signals were compared by ROC-AUC:
+
+| signal | AUC | τ @95% OOD rejection | in-domain wrongly refused |
+|---|---|---|---|
+| top1 cosine | **0.713** | 0.7676 | **78.8%** |
+| top1 × margin | 0.493 | 0.1197 | 90.4% |
+| margin (top1 − mean of rest) | 0.437 | 0.1697 | 93.2% |
+| margin_top5 | 0.477 | 0.1178 | 93.4% |
+
+The hypothesis behind the margin signals — that an answerable query has one distinctly best passage
+while an unanswerable one faces a flat field of mediocre matches — is **refuted**. All three score
+at or below chance.
+
+Even the best operating point (50% OOD rejection) refuses 14.2% of answerable queries. There is no
+threshold under 10% collateral damage, so **none ships.** The reason is structural rather than a
+tuning failure: a static embedder maps any text to a bag-of-subwords centroid, so every query has
+*some* passage at moderate cosine. That score measures topical proximity, which is a different
+question from "does this corpus answer this".
+
+Fixing it properly means a different signal — a cross-encoder over the top-k, or an intent
+classifier for conversational/command utterances, which the probe families suggest would separate
+cleanly. That is the next piece of work, not something to fake with a constant.
+
+### The two-lane toggle, and why it is disabled
+
+The fast lane (potion) is 256-dim; the quality lane (e5-small) is 384-dim. A 384-dim query cannot
+search a 256-dim index, so the lanes need *separate corpus embeddings* — ~477 MB more and ~26
+minutes of e5 forward passes, against a 2 GB deployment. The toggle is disabled in the UI and the
+API returns a **400 with the dimensions named**, rather than the HTTP 500 it used to.
 
 ## Running it
 
