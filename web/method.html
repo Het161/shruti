@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F2F1ED" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#131313" media="(prefers-color-scheme: dark)">
 <title>SHRUTI — method</title>
 <link rel="stylesheet" href="/styles.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>◉</text></svg>">
@@ -87,13 +90,31 @@
       <table class="data">
         <thead><tr><th>Gate</th><th>Mechanism</th></tr></thead>
         <tbody>
-          <tr><td><b>scope</b></td><td>threshold τ on the top <b>dense cosine</b> — not the fused RRF score, which is rank-derived and has no stable cross-query meaning. Until calibrated it reports itself uncalibrated rather than applying a guessed number.</td></tr>
+          <tr><td><b>scope</b></td><td>threshold τ on the top <b>dense cosine</b> — not the fused RRF score, which is rank-derived and has no stable cross-query meaning. <b>Calibration was run and produced a negative result</b> — see below. The gate reports itself uncalibrated in every response rather than shipping a number that would break the product.</td></tr>
           <tr><td><b>safety</b></td><td>pattern screen on the transcript, before retrieval, so a refusal costs nothing</td></tr>
           <tr><td><b>grounding</b></td><td>Tier 1 grounded by construction; Tier 2 verified by token containment against cited passages — not an LLM judge, which would add a round-trip and another chance to be wrong</td></tr>
           <tr><td><b>injection</b></td><td>passages wrapped as data, never interpolated as instructions; instruction-like passages flagged inline</td></tr>
         </tbody>
       </table>
     </div>
+  </section>
+
+  <!-- --------------------------------------------- scope calibration -->
+  <section class="panel">
+    <div class="panel-label">Scope gate calibration — a negative result</div>
+    <p>500 in-domain queries scored against 70 authored out-of-domain probes (conversational,
+    assistant-meta, personal-private, actionable-command) across all five languages. Four candidate
+    abstention signals compared by ROC-AUC — the probability that a random answerable query outscores
+    a random unanswerable one.</p>
+    <div class="scroll-x"><div id="calib">loading…</div></div>
+    <p><b>The margin hypothesis was refuted.</b> The idea that an answerable query shows one
+    distinctly peaked best match, while an unanswerable one faces a flat field of mediocre matches,
+    scores at or below chance. Only top-1 cosine carries signal, and not enough of it: rejecting 95%
+    of out-of-domain traffic costs 78.8% of answerable queries.</p>
+    <p>The cause is structural. A static embedder maps any text to a bag-of-subwords centroid, so
+    every query has <em>some</em> passage at moderate cosine — that measures topical proximity, which
+    is a different question from whether the corpus answers it. <b>No threshold ships</b>, and the
+    gate reports itself uncalibrated on every request.</p>
   </section>
 
   <div class="status-strip" id="status"></div>
@@ -120,6 +141,37 @@ fetch("/results/chunking_lab.json")
   })
   .catch((e) => {
     $("lab").innerHTML = `<span class="score-nums">Chunking lab has not been run yet (${e.message}). Run <code>python lab/chunking_eval.py</code>.</span>`;
+  });
+
+fetch("/results/scope_calibration.json")
+  .then((r) => (r.ok ? r.json() : Promise.reject(new Error("not run yet"))))
+  .then((d) => {
+    const rows = Object.entries(d.signals)
+      .sort((a, b) => b[1].auc - a[1].auc)
+      .map(([name, s]) => [
+        name === d.best_signal ? `<b>${name}</b>` : name,
+        s.auc.toFixed(3),
+        s.in_p50.toFixed(4),
+        s.ood_p50.toFixed(4),
+        `${(s.ood_rejected * 100).toFixed(1)}%`,
+        `${(s.in_domain_refused * 100).toFixed(1)}%`,
+      ]);
+    const ops = d.operating_points
+      .map((o) => [
+        `${(o.target * 100).toFixed(0)}%`,
+        o.tau.toFixed(4),
+        `${(o.ood_rejected * 100).toFixed(1)}%`,
+        `${(o.in_domain_refused * 100).toFixed(1)}%`,
+      ]);
+    $("calib").innerHTML =
+      table(["signal", "AUC", "in p50", "ood p50", "OOD rejected", "answerable refused"], rows) +
+      `<div class="score-nums" style="margin:12px 0 6px">operating points for ${d.best_signal}</div>` +
+      table(["target OOD rejection", "tau", "OOD rejected", "answerable refused"], ops) +
+      `<div class="score-nums">${d.n_in_domain} in-domain · ${d.n_out_of_domain} out-of-domain probes · ` +
+      `shipped: <b style="color:var(--refuse)">${d.shipped ? "tau " + d.shipped.tau.toFixed(4) : "none — no threshold under 10% collateral"}</b></div>`;
+  })
+  .catch((e) => {
+    $("calib").innerHTML = `<span class="score-nums">Calibration has not been run yet (${e.message}). Run <code>python lab/calibrate_scope.py</code>.</span>`;
   });
 
 fetch("/api/manifest")

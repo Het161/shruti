@@ -136,9 +136,22 @@ button.mic[data-recording="true"] { border-color: var(--refuse); color: var(--re
   border: 1px solid var(--rule-strong); border-radius: 999px;
   padding: 4px 12px; cursor: pointer; line-height: 1.5;
 }
-.chip:hover { border-color: var(--trace); color: var(--trace); background: var(--trace-wash); }
-.chip[data-kind="refuse"], .chip[data-kind="ood"] { color: var(--refuse); border-color: color-mix(in srgb, var(--refuse) 40%, transparent); }
-.chip[data-kind="refuse"]:hover, .chip[data-kind="ood"]:hover { background: var(--refuse-wash); border-color: var(--refuse); color: var(--refuse); }
+/* Selectors are qualified with `button` deliberately. The generic `button:hover:not(:disabled)`
+   rule above scores (0,3,1); a bare `.chip:hover` scores (0,2,0) and loses to it, so the chip got
+   painted with the solid dark-on-teal button fill and its label became unreadable. Matching the
+   element as well as the class lifts these to (0,3,1)/(0,4,1) and they win. */
+button.chip:hover:not(:disabled) { border-color: var(--trace); color: var(--trace); background: var(--trace-wash); }
+button.chip[data-kind="refuse"], button.chip[data-kind="ood"] { color: var(--refuse); border-color: color-mix(in srgb, var(--refuse) 45%, transparent); }
+button.chip[data-kind="refuse"]:hover:not(:disabled),
+button.chip[data-kind="ood"]:hover:not(:disabled) { background: var(--refuse-wash); border-color: var(--refuse); color: var(--refuse); }
+/* Touch devices keep :hover asserted after a tap, so without this the last-tapped chip stays
+   stuck in its hover paint. Only apply hover styling where hovering is actually possible. */
+@media (hover: none) {
+  button.chip:hover:not(:disabled) { background: transparent; color: var(--ink); border-color: var(--rule-strong); }
+  button.chip[data-kind="refuse"]:hover:not(:disabled),
+  button.chip[data-kind="ood"]:hover:not(:disabled) { background: transparent; color: var(--refuse); border-color: color-mix(in srgb, var(--refuse) 45%, transparent); }
+}
+button.chip:active { transform: translateY(1px); }
 
 .toggles { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--rule); }
 .toggle select:disabled { opacity: .45; cursor: not-allowed; }
@@ -249,9 +262,114 @@ table.data td.num { font-family: var(--mono); text-align: right; font-variant-nu
   * { animation: none !important; transition: none !important; }
 }
 
-@media (max-width: 560px) {
-  .shell { padding: 20px 14px 60px; }
-  .console { flex-wrap: wrap; }
-  #q { flex-basis: 100%; }
-  .reading-total { font-size: 23px; }
+/* ------------------------------------------------------------------ mobile
+ *
+ * The demo is voice-first, and voice on a phone is the most likely way a judge
+ * actually tries this — mic permission requires HTTPS, which the deployment has, so
+ * the phone path is real rather than theoretical. Target is 390px (iPhone 14/15) with
+ * 320px still usable.
+ *
+ * Four things here are iOS-specific and each is a real bug rather than polish:
+ *
+ * 1. An input with font-size < 16px makes Safari zoom the whole page on focus, and it
+ *    does not zoom back out. The query field is 15.5px on desktop and must be 16px here.
+ * 2. `-webkit-text-size-adjust` stops Safari inflating text on orientation change.
+ * 3. Tap targets below ~44px are unreliably hit; the mic button in particular must not
+ *    be a 30px-tall strip when it is the primary control.
+ * 4. `env(safe-area-inset-*)` keeps content clear of the notch and home indicator.
+ */
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (max-width: 720px) {
+  .shell {
+    padding: 18px max(14px, env(safe-area-inset-left)) calc(48px + env(safe-area-inset-bottom));
+  }
+
+  /* Masthead stacks: wordmark and nav on one line, tagline beneath. Keeping all three
+     inline at 390px squeezed the nav into a two-character-per-line column. */
+  header.masthead {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto;
+    gap: 4px 12px;
+    align-items: baseline;
+  }
+  /* Explicit row/column placement rather than relying on auto-flow. With the default sparse
+     algorithm, giving the tagline `grid-column: 1/-1` advances the placement cursor to row 2,
+     which pushes the nav — a later sibling in DOM order — down to a third row. Naming every
+     cell removes the dependence on placement order entirely. */
+  .wordmark { grid-column: 1; grid-row: 1; font-size: 17px; }
+  nav.pages { grid-column: 2; grid-row: 1; margin-left: 0; justify-self: end; gap: 12px; }
+  .tagline { grid-column: 1 / -1; grid-row: 2; font-size: 12px; }
+
+  .panel { padding: 13px; }
+
+  /* Input takes the full width; the two buttons share the row beneath it, so neither
+     gets crushed and both clear the 44px tap target. */
+  .console { flex-wrap: wrap; gap: 8px; }
+  #q {
+    flex: 1 1 100%;
+    font-size: 16px;      /* MUST stay >= 16px — see note 1 above */
+    padding: 12px;
+    min-height: 46px;
+  }
+  button { flex: 1 1 0; min-height: 46px; padding: 0 12px; font-size: 12.5px; }
+  button.mic { flex: 1 1 0; }
+
+  .chip { min-height: 36px; padding: 6px 13px; font-size: 13px; }
+
+  /* Toggles stack into full-width rows with the select right-aligned, instead of three
+     labelled dropdowns fighting for one line. */
+  .toggles { flex-direction: column; gap: 9px; }
+  .toggle { justify-content: space-between; width: 100%; font-size: 11.5px; }
+  .toggle select { min-height: 34px; flex: 0 1 62%; }
+
+  /* The waterfall stays a single bar — it is the product's face and splitting it would
+     destroy the proportions it exists to show. It gets taller so thin segments remain
+     tappable, and the legend becomes a two-column grid so ms readings stay aligned
+     rather than reflowing into a ragged block. */
+  .waterfall { height: 34px; }
+  .legend {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 3px 12px;
+  }
+  .legend-item { font-size: 10px; }
+
+  .reading { gap: 4px; }
+  .reading-total { font-size: 25px; }
+  .reading-meta { font-size: 10px; word-break: break-word; }
+
+  .answer { font-size: 16.5px; }
+  .passage-text { font-size: 14px; }
+  .score-nums { font-size: 9.5px; word-break: break-word; }
+
+  /* Tables scroll inside their own container so the page body never scrolls sideways. */
+  .scroll-x { -webkit-overflow-scrolling: touch; }
+  table.data { font-size: 12px; }
+  table.data th, table.data td { padding: 6px 8px; white-space: nowrap; }
+
+  .status-strip { font-size: 9.5px; line-height: 2; }
+}
+
+@media (max-width: 380px) {
+  .wordmark { font-size: 15.5px; }
+  nav.pages { gap: 9px; }
+  nav.pages a { font-size: 10.5px; }
+  .legend { grid-template-columns: 1fr; }
+  .reading-total { font-size: 22px; }
+  .samples { gap: 6px; }
+}
+
+/* Landscape phones: vertical space is the scarce axis, so trim the tall elements
+   rather than the horizontal layout. */
+@media (max-height: 460px) and (orientation: landscape) {
+  .shell { padding-top: 10px; }
+  header.masthead { margin-bottom: 12px; padding-bottom: 8px; }
+  .wave { height: 30px; }
+  .waterfall { height: 24px; }
 }
