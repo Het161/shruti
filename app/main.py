@@ -397,6 +397,19 @@ async def voice(ws: WebSocket) -> None:
             await ws.close()
 
 
+@app.post("/api/echo")
+async def echo(req: AskRequest) -> dict[str, int]:
+    """Diagnostic: a POST that does no work, to separate platform cost from pipeline cost.
+
+    Exists because the deployed `server_side_ms` carried a *constant* ~104ms above `pipeline_ms` —
+    identical for a refused query doing 0.09ms of work and a full query doing 17ms. Constant means
+    it is not compute, not response size, and not CPU throttling. Locally the same gap is 0.32ms,
+    so it is a property of the deployment, and this endpoint isolates which half of the request
+    path it lives in.
+    """
+    return {"len": len(req.text)}
+
+
 @app.get("/api/providers")
 async def providers() -> JSONResponse:
     """Live provider status, including which are disabled and why."""

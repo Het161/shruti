@@ -624,3 +624,54 @@ A 30–50k index would roughly double MRR. It is not taken, because a demo that 
 judge's question is worse than one that answers it at rank 3 instead of rank 1 — coverage is the
 product, precision is the metric. The reranker recovers most of the gap without giving up either,
 which is why it was the right one of the three to build.
+
+---
+
+## Container variance on a free serverless tier — three runs, one miss
+
+Re-running the benchmark after the guardrail and reranker work produced a result worth publishing
+in full rather than cherry-picking.
+
+| run | server_side P50 | server_side P100 | verdict |
+|---|---|---|---|
+| 1 (16:19) | 69.14 | 122.77 | MET |
+| 2 (19:30) | 123.33 | **201.56** | **MISSED by 1.56ms** |
+| 3 (20:10) | 39.05 | 134.36 | MET |
+
+Same code in runs 2 and 3. The difference is the container instance.
+
+### Diagnosis
+
+Run 2 showed a **constant ~104ms** gap between `server_side_ms` and `pipeline_ms` — and constant is
+the clue. A refused query doing 0.09ms of work paid the same 103.64ms as a full query doing 16.75ms.
+That rules out compute, response size, and CPU throttling, all of which would scale with work.
+
+Locally the same code shows a 0.32ms gap, so it is a property of the deployment. Isolating it with
+a deliberately trivial `POST /api/echo` endpoint on a fresh container:
+
+| endpoint | server p50 |
+|---|---|
+| GET /api/health | 0.64ms |
+| POST /api/echo (zero work) | **20.99ms** |
+| POST /api/ask (refused) | 20.94ms |
+| POST /api/ask (full pipeline) | 39.13ms |
+
+Two findings:
+
+1. **POST carries ~21ms of platform overhead** that GET does not — request-body handling through
+   Modal's ASGI proxy. It is constant, unavoidable from application code, and it lands inside
+   `server_side_ms` because that metric brackets everything the server does. Roughly half of the
+   healthy-run P50 is therefore platform, not pipeline.
+2. **Run 2's container was degraded.** The same code on a fresh instance shows 21ms where that one
+   showed 104ms.
+
+### What this means for the claim
+
+The honest statement is not "we meet 200ms" but: **the pipeline meets it with large margin
+(P100 111ms, P50 19ms), the deployed server-side figure meets it on healthy containers (122.77ms
+and 134.36ms), and one run on a degraded free-tier container missed by 1.56ms.**
+
+Reporting only runs 1 and 3 would have been the easy version and would have been misleading. A
+free serverless tier does not guarantee instance quality, and a single benchmark can land on a bad
+one — which is itself an argument for publishing percentiles from repeated runs rather than a
+single number, and for pinning a warm container before a judged demo.
