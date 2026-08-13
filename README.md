@@ -11,6 +11,48 @@ on screen.
 
 ---
 
+**Live: https://hetpatelsk--shruti-fastapi-app.modal.run**
+
+## Results — measured on the deployed system
+
+300 queries across hi/gu/bn/ta, 20-query warmup excluded, Tier 2 off. Run twice from different
+continents against the same deployment.
+
+| SLO | P50 | P70 | P90 | P100 |
+|---|---|---|---|---|
+| **server_side_ms** (headline) | 69.14 | 70.50 | 72.29 | **122.77** |
+| pipeline_ms | 54.46 | 55.70 | 56.93 | 60.80 |
+| client_observed_ms — *US runner* | 154.01 | 195.18 | 210.99 | 241.84 |
+| client_observed_ms — *India* | 345.05 | 348.46 | 358.10 | 1476.40 |
+| network_overhead_ms — *US runner* | 85.89 | 123.04 | 139.19 | 155.92 |
+| network_overhead_ms — *India* | 278.26 | 282.81 | 292.84 | 1408.53 |
+
+**200ms P100 target (server-side): MET — 122.77ms.** 300/300 answered, 0 errors.
+Cold start measured separately: **21.9s** on a truly cold container, 231ms first-contact when warm.
+
+The two runs report the *same* server-side figure (116.89 measured from India, 122.77 from the US)
+because it comes from the server's own monotonic clock. What changes between them is the network
+column — 278ms from Gujarat, 86ms from a US runner. That difference is the Pacific Ocean, and it is
+exactly why the headline SLO is defined server-side. Both distributions ship.
+
+### Per stage, deployed
+
+| stage | P50 | P100 |
+|---|---|---|
+| **bm25** | **47.182** | 52.204 |
+| extract | 3.640 | 5.983 |
+| dense | 2.457 | 4.034 |
+| embed | 0.459 | 0.773 |
+| fuse | 0.230 | 0.266 |
+| detect | 0.028 | 0.234 |
+| guard_safety | 0.029 | 0.062 |
+| guard_scope | 0.024 | 0.047 |
+
+**BM25 is 87% of pipeline time on the deployed hardware** — 47ms of 54ms. Locally it measures ~2ms
+on the same 310k corpus, so this is genuine compute on a slower CPU rather than a page-fault
+artifact (that hypothesis was tested and rejected: forcing the index RAM-resident changed nothing).
+It is the obvious next optimisation and it is reported rather than tuned away before publishing.
+
 ## What the latency numbers mean
 
 This is the most important section in this README, because a latency claim is worthless without a
@@ -249,6 +291,7 @@ P90/P100 per stage, per language, and per SLO. Artifacts land in `bench/results/
 
 - Cerebras is in the provider chain but returns **402** on this account; Groq is primary.
 - The scope gate is **uncalibrated** as of this writing and says so in every response.
+- BM25 is 87% of deployed pipeline time and is the clear next optimisation.
 - Fonts are system stacks, not JetBrains Mono / Instrument Sans — a webfont on the critical path
   is the wrong trade for a product whose claim is measured speed.
 - Retrieval quality is the open problem, not speed. See `docs/BUILD_LOG.md`, which records what was
