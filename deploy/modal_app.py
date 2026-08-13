@@ -67,7 +67,12 @@ image = (
     # a cached layer where they cost nothing on redeploy.
     .run_commands(
         "python -c \"from model2vec import StaticModel; "
-        "StaticModel.from_pretrained('minishlab/potion-multilingual-128M')\""
+        "StaticModel.from_pretrained('minishlab/potion-multilingual-128M')\"",
+        # Reranker weights baked in too. It is off by default, but a Tier 2 request that had to
+        # download 300 MB first would be far worse than one that simply runs slowly.
+        "python -c \"from huggingface_hub import hf_hub_download as d; "
+        "d('jinaai/jina-reranker-v2-base-multilingual','onnx/model_int8.onnx'); "
+        "d('jinaai/jina-reranker-v2-base-multilingual','tokenizer.json')\"",
     )
     .add_local_dir("app", remote_path="/root/app")
     .add_local_dir("web", remote_path="/root/web")

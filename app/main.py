@@ -35,7 +35,7 @@ from app.corpus import Corpus
 from app.pipeline import VERSION, Pipeline
 from app.providers.llm import ProviderChain, build_chain
 from app.providers.sarvam_ws import SarvamStream, SpeechEvent, Transcript
-from app.schemas import AskRequest, AskResponse, HealthResponse
+from app.schemas import AskRequest, AskResponse, HealthResponse, StageTiming
 from app.settings import get_settings
 from app.stages.base import ErrorKind, StageError
 from app.stages.dense import DenseIndex
@@ -248,6 +248,30 @@ async def ask(req: AskRequest) -> AskResponse:
     # pipeline percentiles measure the guaranteed path rather than a provider's mood that second.
     if req.generate and state.chain is not None and result.answer is not None:
         settings = get_settings()
+
+        # Rerank the Tier 1 passages before generating from them — inside the Tier 2 lane, never
+        # before Tier 1 was served. The measured cost (561ms at depth 10) is 2.8x the whole answer
+        # SLO, so its only defensible home is here, where Tier 1 has already reached the user and
+        # this cost shows up as "full answer time" instead.
+        if settings.rerank_enabled and len(result.passages) > 1:
+            try:
+                from app.stages.rerank import get_reranker
+
+                reranker = get_reranker()
+                out = reranker.rerank(
+                    req.text, [p.passage.text for p in result.passages], settings.rerank_depth
+                )
+                result.passages = [result.passages[i] for i in out.order]
+                result.timings.stages.append(
+                    StageTiming(
+                        name="rerank",
+                        offset_ms=result.timings.total_ms,
+                        duration_ms=round(out.elapsed_ms, 3),
+                    )
+                )
+            except Exception as e:
+                log.warning("rerank skipped: %s", e)
+
         stream = None
         async for event, partial in generate_streaming(
             state.chain,

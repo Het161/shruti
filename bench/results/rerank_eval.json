@@ -1,0 +1,41 @@
+{
+  "n_queries": 150,
+  "rows": [
+    {
+      "config": "baseline (dense+BM25+RRF)",
+      "mrr@10": 0.19537830687830687,
+      "recall@10": 0.205,
+      "delta_mrr_pct": 0.0,
+      "rerank_p50_ms": 0.0,
+      "rerank_p100_ms": 0.0,
+      "total_p50_ms": 2.567729003203567
+    },
+    {
+      "config": "+ cross-encoder top-10",
+      "mrr@10": 0.31266666666666665,
+      "recall@10": 0.205,
+      "delta_mrr_pct": 60.03141375434986,
+      "rerank_p50_ms": 561.1208124973928,
+      "rerank_p100_ms": 940.2273749947199,
+      "total_p50_ms": 563.6885415005963
+    },
+    {
+      "config": "+ cross-encoder top-20",
+      "mrr@10": 0.3902857142857143,
+      "recall@10": 0.265,
+      "delta_mrr_pct": 99.758980677833,
+      "rerank_p50_ms": 1335.0917294992541,
+      "rerank_p100_ms": 2087.749165999412,
+      "total_p50_ms": 1337.6594585024577
+    },
+    {
+      "config": "+ cross-encoder top-50",
+      "mrr@10": 0.4228492063492063,
+      "recall@10": 0.31,
+      "delta_mrr_pct": 116.42587301802227,
+      "rerank_p50_ms": 4072.8509789951204,
+      "rerank_p100_ms": 5199.831750003796,
+      "total_p50_ms": 4075.418707998324
+    }
+  ]
+}

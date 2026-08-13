@@ -91,6 +91,27 @@ class Settings(BaseSettings):
     # --- startup ---------------------------------------------------------------------
     warmup_queries: int = Field(default=20, alias="SHRUTI_WARMUP_QUERIES")
 
+    # --- reranking (Tier 2 only) -----------------------------------------------------
+    # Off by default. Measured on 150 eval queries against the shipped pipeline:
+    #
+    #   depth   MRR@10   ΔMRR      rerank p50   rerank p100
+    #   base    0.1954     —             —            —
+    #   10      0.3127   +60.0%       561ms        940ms
+    #   20      0.3903   +99.8%      1335ms       2088ms
+    #   50      0.4228  +116.4%      4073ms       5200ms
+    #
+    # The quality gain is real and large — MRR doubles at depth 20. The cost makes it structurally
+    # impossible on the Tier 1 path: even depth 10 is 2.8x the entire 200ms answer budget, against
+    # a Tier 1 that currently completes in ~20ms. So this runs in the Tier 2 lane, after the
+    # guaranteed answer has already been served, where its cost lands on "full answer time" —
+    # reported separately — rather than on "answer visible", which is the SLO.
+    #
+    # Depth 10 is the default because Tier 2 already spends ~477ms on generation TTFT; depth 20
+    # would put a voice reply near two seconds for a 40-point MRR gain the user mostly perceives
+    # through the generated text anyway.
+    rerank_enabled: bool = Field(default=False, alias="SHRUTI_RERANK")
+    rerank_depth: int = Field(default=10, alias="SHRUTI_RERANK_DEPTH")
+
     @property
     def has_generation(self) -> bool:
         return bool(self.cerebras_api_key or self.groq_api_key)
