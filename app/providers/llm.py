@@ -31,7 +31,7 @@ import json
 import logging
 import time
 from collections.abc import AsyncIterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import httpx
 

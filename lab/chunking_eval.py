@@ -42,7 +42,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import re
 import sys
 import time
 from collections import defaultdict
@@ -55,9 +54,8 @@ import pyarrow.parquet as pq
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.stages.answer import split_sentences  # noqa: E402
-from app.stages.embed import get_embedder  # noqa: E402
-from app.stages.lexical import LexicalIndex, tokenize  # noqa: E402
+from app.stages.answer import split_sentences
+from app.stages.embed import get_embedder
 
 log = logging.getLogger("chunking_eval")
 

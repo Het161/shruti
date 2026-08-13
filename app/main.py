@@ -35,11 +35,11 @@ from app.corpus import Corpus
 from app.pipeline import VERSION, Pipeline
 from app.providers.llm import ProviderChain, build_chain
 from app.providers.sarvam_ws import SarvamStream, SpeechEvent, Transcript
-from app.stages.generate import finalize, generate_streaming
 from app.schemas import AskRequest, AskResponse, HealthResponse
 from app.settings import get_settings
 from app.stages.base import StageError
 from app.stages.dense import DenseIndex
+from app.stages.generate import finalize, generate_streaming
 from app.stages.lexical import LexicalIndex
 from app.timing import RequestTimer
 
@@ -245,7 +245,7 @@ async def ask(req: AskRequest) -> AskResponse:
     if req.generate and state.chain is not None and result.answer is not None:
         settings = get_settings()
         stream = None
-        async for event, stream in generate_streaming(
+        async for event, partial in generate_streaming(
             state.chain,
             req.text,
             result.passages,
@@ -253,6 +253,7 @@ async def ask(req: AskRequest) -> AskResponse:
             ttft_timeout_ms=settings.gen_ttft_timeout_ms,
             total_timeout_ms=settings.gen_total_timeout_ms,
         ):
+            stream = partial
             if event == "done":
                 break
         if stream is not None:
@@ -325,7 +326,7 @@ async def voice(ws: WebSocket) -> None:
                     message = await ws.receive()
                     if "bytes" in message and message["bytes"] is not None:
                         await stt.send_audio(message["bytes"])
-                    elif "text" in message and message["text"]:
+                    elif message.get("text"):
                         if json.loads(message["text"]).get("type") == "flush":
                             await stt.flush()
                     elif message.get("type") == "websocket.disconnect":

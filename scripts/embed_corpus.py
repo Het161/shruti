@@ -41,9 +41,9 @@ import pyarrow.parquet as pq
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from app.stages.dense import DenseIndex  # noqa: E402
-from app.stages.embed import get_embedder  # noqa: E402
-from app.stages.lexical import LexicalIndex  # noqa: E402
+from app.stages.dense import DenseIndex
+from app.stages.embed import get_embedder
+from app.stages.lexical import LexicalIndex
 
 log = logging.getLogger("embed_corpus")
 

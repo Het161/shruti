@@ -46,7 +46,17 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
-ignore = ["E501"]
+ignore = [
+    "E501",
+    # Ambiguous-Unicode rules, disabled deliberately rather than worked around.
+    # This is a multilingual Indic project: the tokeniser's punctuation class must literally
+    # contain danda (।), double danda (॥), en dashes and curly quotes in order to strip them, and
+    # the prose in docstrings uses real typographic characters. Every finding these rules produced
+    # was a correct character doing its job, so silencing the noise beats mangling the code.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+]
 
 [tool.mypy]
 python_version = "3.13"

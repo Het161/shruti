@@ -8,14 +8,14 @@ gracefully instead of 500-ing.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Protocol, TypeVar, runtime_checkable
 
 TIn = TypeVar("TIn", contravariant=True)
 TOut = TypeVar("TOut", covariant=True)
 
 
-class ErrorKind(str, Enum):
+class ErrorKind(StrEnum):
     """Failure taxonomy.
 
     The distinction that matters operationally is *recoverable* vs not. A `PROVIDER_TIMEOUT` on

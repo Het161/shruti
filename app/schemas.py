@@ -14,7 +14,7 @@ than the embedding itself.
 
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Literal
 
 import numpy as np
@@ -93,7 +93,7 @@ class FusionOutput(BaseModel):
 # ---------------------------------------------------------------------------------------
 
 
-class Gate(str, Enum):
+class Gate(StrEnum):
     """Which guardrail fired. Shown by name in the UI's refusal lamp."""
 
     SCOPE = "scope"

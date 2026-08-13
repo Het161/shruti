@@ -45,7 +45,7 @@ _LATIN = re.compile(r"^[a-z0-9]+$")
 # where queries are natural-language questions and words like "how" and "what" carry intent that
 # query_type classification depends on.
 _STOP = frozenset(
-    "a an the of to in is are was were and or for on at by with as from that this it be been".split()
+    ["a", "an", "the", "of", "to", "in", "is", "are", "was", "were", "and", "or", "for", "on", "at", "by", "with", "as", "from", "that", "this", "it", "be", "been"]
 )
 
 
