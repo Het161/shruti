@@ -141,6 +141,31 @@ def content_id(text: str) -> str:
     return hashlib.blake2b(text.encode("utf-8"), digest_size=8).hexdigest()
 
 
+def keep_query(query_id: int, sample_1_in: int) -> bool:
+    """Deterministic query subsampling, stable across language shards.
+
+    The validation split is far larger than its file size suggests: 97,941 queries per language,
+    ~19.4 passages each, which is ~1.9M passages from a single shard and ~4.75M across four
+    languages. That is 10-20x more than this system should index — it would mean ~4.9 GB of float32
+    embeddings, a multi-gigabyte HNSW graph, and exact search in the 50-100ms range, which spends
+    most of the answer budget on a corpus size nobody asked for.
+
+    So we sample. Two properties matter, and neither is satisfied by simply taking the first N rows:
+
+    1. **Unbiased.** Parquet row order is not random — it may correlate with query id, source, or
+       collection date. Hashing decorrelates the selection from whatever structure the file has.
+    2. **Identical across languages.** The hash depends only on `query_id`, which is stable across
+       shards, so every language contributes translations of *the same* queries. This is what makes
+       cross-lingual comparison meaningful, and it is what lets the English passages — repeated
+       identically in every shard — collapse cleanly under content-hash dedupe instead of
+       fragmenting into near-duplicates of different query subsets.
+    """
+    if sample_1_in <= 1:
+        return True
+    digest = hashlib.blake2b(str(query_id).encode("ascii"), digest_size=4).digest()
+    return int.from_bytes(digest, "big") % sample_1_in == 0
+
+
 # ---------------------------------------------------------------------------------------
 # Disk safety
 # ---------------------------------------------------------------------------------------
@@ -249,6 +274,7 @@ class BufferedWriter:
 
 @dataclass
 class BuildStats:
+    rows_seen: int = 0
     rows_read: int = 0
     passages_seen: int = 0
     passages_kept: int = 0
@@ -260,6 +286,7 @@ class BuildStats:
 
     def as_dict(self) -> dict[str, Any]:
         return {
+            "rows_seen": self.rows_seen,
             "rows_read": self.rows_read,
             "passages_seen": self.passages_seen,
             "passages_kept": self.passages_kept,
@@ -306,6 +333,7 @@ def build(
     cache_dir: Path,
     limit_queries: int | None,
     keep_shards: bool,
+    sample_1_in: int = 1,
 ) -> BuildStats:
     out_dir.mkdir(parents=True, exist_ok=True)
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -377,10 +405,14 @@ def build(
                 for row in iter_rows(shard):
                     if limit_queries is not None and n_rows >= limit_queries:
                         break
-                    n_rows += 1
-                    stats.rows_read += 1
 
                     qid = int(row["query_id"])
+                    stats.rows_seen += 1
+                    if not keep_query(qid, sample_1_in):
+                        continue
+
+                    n_rows += 1
+                    stats.rows_read += 1
                     qtype = row.get("query_type") or ""
                     pas = row.get("passages") or {}
                     translated = pas.get("Translated_passages") or []
@@ -447,6 +479,7 @@ def build(
         "split": "validation",
         "languages": languages,
         "indexed_languages": sorted(stats.per_lang_kept),
+        "sample_1_in": sample_1_in,
         "stats": stats.as_dict(),
         "built_at_unix": int(time.time()),
         "files": {
@@ -465,6 +498,14 @@ def main() -> int:
     ap.add_argument("--out", type=Path, default=Path("data/corpus"))
     ap.add_argument("--cache", type=Path, default=Path(".cache/shards"))
     ap.add_argument("--limit-queries", type=int, default=None, help="Per-language cap, for smoke runs")
+    ap.add_argument(
+        "--sample-1-in",
+        type=int,
+        default=16,
+        help="Keep 1 query in N, chosen by a hash of query_id so the same queries are selected in "
+        "every language. Default 16 -> ~6.1k queries/lang -> ~290k passages. Use 1 for everything "
+        "(~4.75M passages; will not fit in memory or the latency budget).",
+    )
     ap.add_argument("--keep-shards", action="store_true", help="Do not delete shards after use")
     ap.add_argument("-v", "--verbose", action="store_true")
     args = ap.parse_args()
@@ -478,13 +519,22 @@ def main() -> int:
     log.info("free disk: %.1f GB", free_bytes(Path.cwd()) / 1024**3)
     t0 = time.perf_counter()
     try:
-        stats = build(args.languages, args.out, args.cache, args.limit_queries, args.keep_shards)
+        stats = build(
+            args.languages,
+            args.out,
+            args.cache,
+            args.limit_queries,
+            args.keep_shards,
+            sample_1_in=args.sample_1_in,
+        )
     except DiskGuardError as e:
         log.error("%s", e)
         return 2
 
     dedupe_rate = stats.passages_deduped / max(1, stats.passages_seen)
     log.info("built in %.1fs", time.perf_counter() - t0)
+    log.info("  queries in shards %d", stats.rows_seen)
+    log.info("  queries sampled   %d (1 in %d)", stats.rows_read, args.sample_1_in)
     log.info("  passages seen     %d", stats.passages_seen)
     log.info("  passages kept     %d", stats.passages_kept)
     log.info("  deduped           %d (%.1f%%)", stats.passages_deduped, 100 * dedupe_rate)
