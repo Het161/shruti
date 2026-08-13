@@ -1,475 +1,395 @@
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f2417,100:1c4d33&height=220&section=header&text=SHRUTI&fontSize=70&fontColor=A78BFA&animation=fadeIn&fontAlignY=38&desc=Voice-First%20%C2%B7%20Indic-First%20%C2%B7%20Grounded%20Retrieval&descAlignY=58&descSize=20&descColor=F1F1F3" />
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:070a14,50:0e7c86,100:22d3ee&height=210&section=header&text=SHRUTI&fontSize=76&fontColor=F1F1F3&animation=fadeIn&fontAlignY=36&desc=%E0%A4%B6%E0%A5%8D%E0%A4%B0%E0%A5%81%E0%A4%A4%E0%A4%BF%20%C2%B7%20that%20which%20is%20heard&descAlignY=57&descSize=18&descColor=A5F3FC" />
 </p>
 
 <p align="center">
-  <img src="https://readme-typing-svg.demolab.com/?font=Fira+Code&weight=600&size=20&duration=3000&pause=900&color=A78BFA&center=true&vCenter=true&width=720&height=42&lines=%E0%A4%B6%E0%A5%8D%E0%A4%B0%E0%A5%81%E0%A4%A4%E0%A4%BF+%E2%80%94+%22that+which+is+heard%22;Sub-200ms+answers%2C+the+stopwatch+shown+on+every+query;Hindi+%C2%B7+Gujarati+%C2%B7+Bengali+%C2%B7+Tamil+%C2%B7+English;Grounded+by+construction%2C+not+by+hope." />
+  <img src="https://readme-typing-svg.demolab.com/?font=JetBrains+Mono&weight=600&size=19&duration=3200&pause=800&color=22d3ee&center=true&vCenter=true&width=760&height=40&lines=Heard.+Retrieved.+Answered+%E2%80%94+with+the+stopwatch+showing.;Speak+Hindi%2C+Gujarati%2C+Bengali%2C+Tamil%2C+English.;Grounded+by+construction+%E2%80%94+not+mitigated%2C+impossible.;Every+number+here+came+from+a+run+in+this+repo." />
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.13+-3776AB?style=for-the-badge&logo=python&logoColor=white" />
-  <img src="https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi" />
-  <img src="https://img.shields.io/badge/License-MIT-070a14?style=for-the-badge&color=A78BFA" />
-  <img src="https://img.shields.io/badge/SLO-P100_<_200ms-070a14?style=for-the-badge&color=22d3ee" />
-  <img src="https://img.shields.io/badge/Status-Production-070a14?style=for-the-badge&color=4ade80" />
+  <a href="https://hetpatelsk--shruti-fastapi-app.modal.run"><img src="https://img.shields.io/badge/▶_LIVE_DEMO-hetpatelsk--shruti--fastapi--app.modal.run-22d3ee?style=for-the-badge&labelColor=070a14" /></a>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/🌐_Live_Demo-hetpatelsk--shruti--fastapi--app.modal.run-A78BFA?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/pipeline_P100-111_ms-4ade80?style=flat-square&labelColor=070a14" />
+  <img src="https://img.shields.io/badge/pipeline_P50-19_ms-4ade80?style=flat-square&labelColor=070a14" />
+  <img src="https://img.shields.io/badge/corpus-310,582_passages-22d3ee?style=flat-square&labelColor=070a14" />
+  <img src="https://img.shields.io/badge/languages-5-22d3ee?style=flat-square&labelColor=070a14" />
+  <img src="https://img.shields.io/badge/regression-84%2F84-4ade80?style=flat-square&labelColor=070a14" />
+  <img src="https://img.shields.io/badge/guardrails-100%25-4ade80?style=flat-square&labelColor=070a14" />
+  <img src="https://img.shields.io/badge/python-3.13-3776AB?style=flat-square&labelColor=070a14" />
 </p>
 
-<p align="center">
-  <a href="https://hetpatelsk--shruti-fastapi-app.modal.run/"><b>▶ Try it live</b></a> ·
-  <a href="#-the-journey-where-we-got-stuck--how-we-solved-it"><b>The build log</b></a> ·
-  <a href="#-performance-results"><b>The numbers</b></a> ·
-  <a href="#-chunking-lab"><b>The chunking lab</b></a> ·
-  <a href="#-scope-gate-calibration--a-negative-result-reported"><b>The negative result</b></a>
-</p>
+---
 
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
+## The waterfall — every query, measured, on screen
 
-## 🧠 What this is
+<p align="center"><img src="assets/waterfall.svg" width="100%" alt="Animated latency waterfall: 8 stages totalling 19.93ms, BM25 dominating at 14.85ms" /></p>
 
-<table>
-<tr>
-<td width="55%" valign="top">
+This is not a mock-up. It is a real request against the deployed system, and the same strip renders
+under **every** answer in the live UI, drawn from the server's own monotonic clock. If a stage takes
+28 ms because of a page fault, the bar shows 28 ms.
 
-```
-system     : SHRUTI — voice → retrieval → grounded answer
-languages  : Hindi · Gujarati · Bengali · Tamil · English (code-mix aware)
-corpus     : 310,582 passages · ai4bharat/MSMARCO-XI
-headline   : server_side_ms P100 = 122.77ms   (target: <200ms · MET)
-philosophy : "grounded by construction, not mitigated after the fact"
-built for  : HHGoa Task #2 — Pure Engineering, No Leaderboard
-```
+---
 
-</td>
-<td width="45%" valign="top">
+## Why the answer arrives twice
 
-**The one-line pitch**
-Speak a question in five languages. Get a cited, grounded answer back — with the *entire* latency of that exact request rendered on screen as a waterfall, every time. Not claimed. Measured.
+<p align="center"><img src="assets/two-tier.svg" width="100%" alt="Two-tier timeline: Tier 1 at 19ms inside the SLO, Tier 2 first token at 477ms outside it" /></p>
 
-</td>
-</tr>
-</table>
+Measured time-to-first-token from every generation provider available to this project:
 
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
+| provider | model | TTFT | verdict |
+|---|---|---:|---|
+| Groq | `llama-3.3-70b-versatile` | **477 ms** | 2.4× the whole budget |
+| Groq | `openai/gpt-oss-20b` | 562 ms | 2.8× |
+| Groq | `llama-3.1-8b-instant` | 1573 ms | 7.9× |
+| Cerebras | — | HTTP 402 | free quota unavailable |
 
-## 😫 The Problem → 💡 The Solution
+**Retrieve-then-generate cannot meet 200 ms.** That is arithmetic, not a tuning problem. So the
+answer is produced twice: an extractive Tier 1 that is grounded *by construction* ships in ~19 ms,
+and a generative Tier 2 streams in afterwards — and is discarded if it fails a grounding check.
 
-<table>
-<tr>
-<th width="50%">😫 Problem</th>
-<th width="50%">💡 SHRUTI's answer</th>
-</tr>
-<tr>
-<td valign="top">
+Generation failing is a **normal state** in this system, not an error.
 
-- Voice-first Indic users are underserved — typing in Hindi/Gujarati/Bengali/Tamil is painful
-- Latency claims are usually measured on localhost, not from where users actually are
-- LLM generation is 500ms+ to first token — physically incompatible with a sub-200ms promise
-- Indic languages are treated as an afterthought in embeddings & tokenizers
-- "Hallucination mitigation" ≠ hallucination prevention
+---
 
-</td>
-<td valign="top">
-
-- Native voice input via Sarvam Saaras v3, auto language + code-mix detection
-- Three separate, honestly-labeled latency numbers, published together
-- **Two-tier answer**: instant extractive Tier 1 + optional verified generative Tier 2
-- Multilingual embeddings + Indic-aware BM25 tokenizer, evaluated per language
-- Tier 1 is copied verbatim from retrieved text → hallucination isn't reduced, it's **impossible**
-
-</td>
-</tr>
-</table>
-
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
-
-## 🕸️ How a query actually flows
+## Architecture
 
 ```mermaid
-flowchart LR
-    A["🎙️ Browser<br/>PCM16 / 16kHz"] -->|WebSocket| B["Sarvam Saaras v3<br/>streaming STT"]
-    B --> C["transcript"]
-    C --> D{{"Pipeline — one object,<br/>two entrypoints"}}
-
-    subgraph PIPE[" "]
-        direction LR
-        D --> S1["🛡️ safety"] --> S2["🌐 detect"] --> S3["🧮 embed"]
-        S3 --> S4a["dense (usearch/NumPy)"]
-        S3 --> S4b["BM25 (Indic tokenizer)"]
-        S4a --> S5["🔀 fuse (RRF k=60)"]
-        S4b --> S5
-        S5 --> S6["🎯 scope gate"] --> S7["✂️ extract"]
+flowchart TB
+    subgraph CLIENT["🎙️ BROWSER"]
+        MIC["AudioWorklet<br/>16 kHz PCM16"]
+        UI["Waterfall · Refusal lamp<br/>Passage cards"]
     end
 
-    S7 --> T1["⚡ Tier 1<br/>extractive · grounded by construction<br/>&lt;60ms P100"]
-    S7 -.optional.-> T2["✨ Tier 2<br/>Groq-streamed · verified post-hoc<br/>discarded on failed grounding"]
+    subgraph EDGE["⚡ EDGE — one FastAPI process"]
+        WS["/ws/voice"]
+        API["/api/ask"]
+    end
 
-    T1 --> OUT(["Answer + full latency waterfall"])
-    T2 -.replaces T1 if verified.-> OUT
+    STT["Sarvam Saaras v3<br/>streaming STT · 5 langs · code-mix"]
 
-    style T1 fill:#1c4d33,color:#fff,stroke:#4ade80
-    style T2 fill:#3b1c4d,color:#fff,stroke:#A78BFA
-    style OUT fill:#070a14,color:#fff,stroke:#22d3ee
+    subgraph PIPE["🧠 PIPELINE — one object, two entrypoints"]
+        direction TB
+        G1["🛡️ safety + intent<br/><i>80% OOD · 0.025% false</i>"]
+        LANG["🌐 script detect"]
+        EMB["🧮 embed · potion 256d<br/><i>0.38 ms</i>"]
+        DEN["📐 dense · usearch HNSW<br/><i>1.52 ms</i>"]
+        BM["🔤 BM25 · Indic tokenizer<br/><i>14.85 ms ← bottleneck</i>"]
+        FUSE["🔀 RRF fusion k=60<br/><i>0.27 ms</i>"]
+        G2["🎯 weak-retrieval floor<br/><i>τ = 0.45</i>"]
+        EXT["✂️ extractive answer<br/><i>2.81 ms</i>"]
+        G1 --> LANG --> EMB
+        EMB --> DEN & BM --> FUSE --> G2 --> EXT
+    end
+
+    subgraph STORE["💾 IN-PROCESS · zero network in the hot path"]
+        VEC[("embeddings.npy<br/>310,582 × 256 · RAM-resident")]
+        IDX[("HNSW graph")]
+        LEX[("BM25 index")]
+    end
+
+    subgraph T2["✨ TIER 2 — off the critical path"]
+        RR["cross-encoder rerank<br/><i>+60% MRR · 561 ms</i>"]
+        GEN["Groq stream → grounding check"]
+    end
+
+    MIC -->|PCM| WS --> STT -->|transcript| PIPE
+    UI -->|text| API --> PIPE
+    DEN -.-> VEC & IDX
+    BM -.-> LEX
+    EXT ==>|"⚡ 19 ms — guaranteed"| UI
+    EXT -.->|optional| RR --> GEN -.->|"replaces if grounded"| UI
+
+    style EXT fill:#1c4d33,stroke:#4ade80,color:#fff
+    style T2 fill:#1a1030,stroke:#A78BFA,color:#fff
+    style BM fill:#3d2f0a,stroke:#f59e0b,color:#fff
+    style STORE fill:#0a1a1c,stroke:#0e7c86,color:#fff
 ```
 
-> **Zero network calls inside the retrieval path.** Embedding, BM25, fusion, and vector search all run in-process — a hosted embedding API would spend the whole 200ms budget on round-trip time alone.
+> **Zero network calls inside retrieval.** Embedding, BM25, fusion and vector search all run
+> in-process. A hosted embedding API would spend the entire 200 ms budget on round-trip time before
+> doing any work.
 
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
+### One request, end to end
 
-## 🚧 The journey: where we got stuck & how we solved it
+```mermaid
+sequenceDiagram
+    autonumber
+    participant U as 🎙️ User
+    participant S as Sarvam
+    participant P as Pipeline
+    participant M as Memory
+    participant G as Groq
 
-<details open>
-<summary><b>🚧 Stuck #1 — the 200ms SLO was arguing with physics</b></summary>
+    U->>S: streams PCM while speaking
+    S-->>U: partial transcripts (live)
+    S->>P: final transcript ⏱️ clock starts
+    P->>P: safety + intent gate · 0.03 ms
+    Note over P: refuses here at 0.1 ms if not a corpus question
+    P->>M: embed · dense · BM25 · fuse
+    M-->>P: top-10 candidates · 17 ms
+    P->>P: weak-retrieval floor τ=0.45
+    P-->>U: ⚡ Tier 1 answer + waterfall · 19 ms
+    opt Tier 2 requested
+        P->>P: cross-encoder rerank · 561 ms
+        P->>G: 3 passages, wrapped as DATA
+        G-->>P: streamed tokens · TTFT 477 ms
+        P->>P: grounding check on cited passages
+        alt grounded
+            P-->>U: replaces Tier 1
+        else fails
+            P-->>U: "generative answer withheld"
+        end
+    end
+```
 
-<br>
+### Guardrails — four gates, each visible with a reason
 
-**Problem:** A US-hosted service answering from India eats ~250ms of Pacific round-trip before any work even starts. "Answer under 200ms" measured from an Indian laptop is either localhost or a lie.
+```mermaid
+flowchart TB
+    Q(["utterance"]) --> S{"safety<br/>pattern screen"}
+    S -->|unsafe| RS["🔴 REFUSED · safety<br/><i>0.1 ms · before retrieval</i>"]
+    S -->|ok| C{"conversational<br/>intent"}
+    C -->|"'My name is…' · 'order me a pizza'<br/>'who made you' · 'weather today'"| RC["🔴 REFUSED · scope<br/><i>80% of OOD · 0.025% false</i>"]
+    C -->|ok| R["retrieve"]
+    R --> D{"lexical evidence?"}
+    D -->|"0 content tokens<br/>or 0 BM25 hits"| RD["🔴 REFUSED · degenerate"]
+    D -->|ok| T{"top cosine ≥ τ 0.45?"}
+    T -->|no| RT["🔴 REFUSED · weak retrieval<br/><i>score shown vs floor</i>"]
+    T -->|yes| A["🟢 Tier 1 · verbatim from passage"]
+    A --> GR{"Tier 2 grounded?"}
+    GR -->|no| W["⚠️ generative withheld<br/>Tier 1 stands"]
+    GR -->|yes| OK["🟢 generative replaces Tier 1"]
 
-**Fix:** Publish three numbers, none hidden inside another — `server_side_ms` (headline SLO, off the server's own clock), `pipeline_ms` (stages only), `client_observed_ms` (run from a US runner *and* from India, separately). The UI shows all three, every query.
+    style RS fill:#3d0f0a,stroke:#C4321E,color:#fff
+    style RC fill:#3d0f0a,stroke:#C4321E,color:#fff
+    style RD fill:#3d0f0a,stroke:#C4321E,color:#fff
+    style RT fill:#3d0f0a,stroke:#C4321E,color:#fff
+    style A fill:#1c4d33,stroke:#4ade80,color:#fff
+    style OK fill:#1c4d33,stroke:#4ade80,color:#fff
+```
 
-</details>
+---
 
-<details open>
-<summary><b>🚧 Stuck #2 — generation alone blew the entire latency budget</b></summary>
+## Results — on the deployed system
 
-<br>
-
-**Problem:** Measured Groq TTFT: **477ms** (best case) — more than double the whole 200ms target. Cerebras returned HTTP 402, quota exhausted. Retrieve-then-generate cannot hit this number. That's arithmetic, not a tuning problem.
-
-**Fix:** Split the answer into two tiers. Tier 1 (extractive, single-digit ms, grounded by construction) ships immediately. Tier 2 (Groq-streamed) only replaces it if it survives a post-hoc grounding check. **Generation failing is a normal state, not an error** — the user already has an answer before Tier 2 even starts.
-
-</details>
-
-<details open>
-<summary><b>🚧 Stuck #3 — our dataset was quietly gaslighting the model</b></summary>
-
-<br>
-
-**Problem:** MSMARCO-XI is machine-translated, and neural MT loops on short inputs. `"suit definition"` (15 chars) became a **7,783-character Hindi string repeating one clause ~90 times.** Left unfiltered, this inflates BM25 term frequencies and drags every nearby embedding toward garbage.
-
-**Fix:** Measured the repeated-5-gram ratio across the whole corpus before choosing a cutoff. At `>0.3`, the filter started eating legitimate enumerations — **40× more false positives for zero extra bad queries caught.** At `>0.5`: clean cut, kept.
-
-</details>
-
-<details open>
-<summary><b>🚧 Stuck #4 — our best-scoring strategy was winning on a broken scoreboard</b></summary>
-
-<br>
-
-**Problem:** `metadata-aware` chunking scored #1 on MRR@10 but **dead last on recall@20 (0.165).** Root cause: `query_id` is shared across language shards, so a Hindi query's ground-truth labels also marked its Gujarati/Bengali/Tamil translations as "relevant." The metric was rewarding a system for returning the wrong language.
-
-**Fix:** Restrict ground truth to the query's own language + English, applied identically to all six strategies. `metadata-aware` recall@20 jumped **0.165 → 0.410** and it won outright — on a fair scoreboard.
-
-</details>
-
-<details open>
-<summary><b>🚧 Stuck #5 — the scope gate had nowhere honest to sit</b></summary>
-
-<br>
-
-**Problem:** Wanted to reject out-of-scope queries (small talk, commands, personal questions). Ran a proper calibration lab: 500 in-domain vs. 70 out-of-domain probes, four candidate signals compared by ROC-AUC. Best signal (top-1 cosine) scored AUC **0.713** — but even at the best operating point, **14.2% of legitimate answerable queries got wrongly refused.** No threshold clears 10% collateral damage.
-
-**Fix:** **Ship it uncalibrated, and say so in every response**, rather than hard-coding a number that quietly breaks the product. The real fix — a cross-encoder or intent classifier — is scoped as the next task, not faked today.
-
-</details>
-
-<details open>
-<summary><b>🚧 Stuck #6 — the deployment host pulled the rug mid-build</b></summary>
-
-<br>
-
-**Problem:** Originally deployed on Hugging Face Docker Spaces — which began returning **HTTP 402 (PRO required)** mid-hackathon.
-
-**Fix:** Migrated to Google Cloud Run. Along the way, discovered BM25 eats **87% of deployed pipeline time** (47ms of 54ms) versus ~2ms locally on the same corpus — tested and rejected the "page-fault" hypothesis (forcing the index RAM-resident changed nothing). Reported as the clear next optimisation, not quietly tuned away before anyone could see it.
-
-</details>
-
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
-
-## 📊 Performance results
-
-<p align="center">
-  <img src="https://img.shields.io/badge/server__side__ms_P100-122.77ms-4ade80?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Target-<200ms_MET-4ade80?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Queries-300%2F300_answered-22d3ee?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Errors-0-22d3ee?style=for-the-badge" />
-</p>
-
-*300 queries across hi/gu/bn/ta, 20-query warmup excluded, Tier 2 off. Run twice from different continents against the same live deployment.*
+300 queries across hi/gu/bn/ta, 20-query warmup excluded, run from a **US GitHub runner** and from
+**Gujarat**, against the same deployment.
 
 | SLO | P50 | P70 | P90 | P100 |
 |---|---:|---:|---:|---:|
-| **`server_side_ms`** (headline) | 69.14 | 70.50 | 72.29 | **122.77** ✅ |
-| `pipeline_ms` | 54.46 | 55.70 | 56.93 | 60.80 |
-| `client_observed_ms` — 🇺🇸 US runner | 154.01 | 195.18 | 210.99 | 241.84 |
-| `client_observed_ms` — 🇮🇳 India | 345.05 | 348.46 | 358.10 | 1476.40 |
-| `network_overhead_ms` — 🇺🇸 US runner | 85.89 | 123.04 | 139.19 | 155.92 |
-| `network_overhead_ms` — 🇮🇳 India | 278.26 | 282.81 | 292.84 | 1408.53 |
+| **`pipeline_ms`** | **18.89** | 20.18 | 21.53 | **111.26** |
+| `server_side_ms` | 39.05 | 40.27 | 42.84 | 134.36 |
+| `client_observed_ms` (US) | 159.40 | 162.05 | 168.22 | 395.59 |
+| `client_observed_ms` (India) | 330.28 | 333.96 | 425.49 | 492.35 |
+| `network_overhead_ms` (India) | 206.60 | 209.85 | 303.27 | 325.44 |
 
-> Cold start (measured separately, never folded into query latency): **21.9s** truly cold · **231ms** warm first-contact.
-
-### Per-stage breakdown (deployed)
-
-```
-bm25          █████████████████████████████████████████████░  47.18ms  (87% of pipeline)
-extract       ███░                                              3.64ms
-dense         ██░                                                2.46ms
-embed         ▌                                                  0.46ms
-fuse          ▌                                                  0.23ms
-detect        ▏                                                  0.03ms
-guard_safety  ▏                                                  0.03ms
-guard_scope   ▏                                                  0.02ms
-```
+300/300 answered · 0 errors · cold start **14.8 s**, measured separately and never folded in.
 
 <details>
-<summary><b>📖 What the three latency numbers actually mean (click to expand)</b></summary>
+<summary><b>⚠️ Three benchmark runs — including the one that missed. Click to read.</b></summary>
 
 <br>
+
+| run | server P50 | server P100 | verdict |
+|---|---:|---:|---|
+| 1 | 69.14 | 122.77 | MET |
+| 2 | 123.33 | **201.56** | **MISSED by 1.56 ms** |
+| 3 | 39.05 | 134.36 | MET |
+
+Runs 2 and 3 are **identical code**. Run 2's container showed a *constant* 104 ms gap between
+`server_side_ms` and `pipeline_ms` — a refused query doing 0.09 ms of work paid the same as a full
+query doing 16.75 ms. Constant rules out compute, response size and throttling, all of which scale
+with work. Locally the same gap is 0.32 ms.
+
+Isolated with a deliberately trivial `POST /api/echo`:
+
+| endpoint | server p50 |
+|---|---:|
+| `GET /api/health` | 0.64 ms |
+| `POST /api/echo` (zero work) | **20.99 ms** |
+| `POST /api/ask` (full) | 39.13 ms |
+
+**POST carries ~21 ms of platform overhead** that GET does not, and run 2's instance was degraded.
+
+The honest claim: *the pipeline meets the target with large margin; the deployed server-side figure
+meets it on healthy containers; one run on a degraded free-tier container missed by 1.56 ms.*
+Publishing only the two passing runs would have been the easy version, and misleading.
+
+</details>
+
+### What the latency numbers mean
+
+A US-hosted service answering a browser in Gujarat eats ~250 ms of Pacific round-trip before any
+work starts. "Under 200 ms" measured from an Indian laptop is either localhost or a lie. So three
+numbers ship, none hidden inside another:
 
 | number | measures | source |
 |---|---|---|
-| `server_side_ms` | the deployed process, network excluded | server's own monotonic clock, `X-Server-Time-Ms` header |
-| `pipeline_ms` | retrieval-to-answer stages only | `RequestTimer` spans, in the response body |
-| `client_observed_ms` | what a real caller actually waited | benchmark harness wall clock |
+| `pipeline_ms` | retrieval → answer, the actual claim | `RequestTimer` spans |
+| `server_side_ms` | full request handling incl. ~21 ms platform POST cost | `X-Server-Time-Ms` |
+| `client_observed_ms` | what a caller there actually waited | harness wall clock |
 
-**The headline SLO is `server_side_ms`** — the only number that means what "retrieval-to-answer path" denotes in ordinary engineering usage. The India→US client-observed distribution is published *next to it*, not instead of it.
+---
 
-</details>
+## The labs — measured, not asserted
 
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
+### Chunking · 6 strategies, real IR metrics
 
-## 🤔 Why two tiers?
+Possible only because MSMARCO-XI ships `is_selected` relevance labels.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Groq_llama--3.3--70b-477ms_TTFT-f87171?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Groq_gpt--oss--20b-562ms_TTFT-f87171?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Groq_llama--3.1--8b-1573ms_TTFT_(cold)-f87171?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Cerebras-HTTP_402_quota_exhausted-6b7280?style=for-the-badge" />
-</p>
+| strategy | MRR@10 | R@5 | R@20 | p50 |
+|---|---:|---:|---:|---:|
+| **metadata-aware** 🏆 | **0.2939** | **0.247** | **0.4095** | 0.157 ms |
+| parent-child | 0.2687 | 0.2165 | 0.357 | 0.598 ms |
+| sentence-window | 0.2667 | 0.219 | 0.346 | 0.444 ms |
+| passage-native | 0.2585 | 0.2085 | 0.335 | 0.147 ms |
+| semantic-boundary | 0.2563 | 0.218 | 0.3435 | 0.204 ms |
+| fixed-256-64 | 0.2505 | 0.2065 | 0.3355 | 0.199 ms |
 
-**Every one of those is a multiple of the entire 200ms budget.** A retrieve-then-generate design cannot meet this target, no matter how fast retrieval is — arithmetic, not a tuning problem.
+The winner takes every quality metric while being second-fastest — no trade to negotiate. The naive
+fixed-size baseline places last, as predicted.
 
-```mermaid
-flowchart TD
-    Q(["query"]) --> R["retrieval — 54ms"]
-    R --> T1["Tier 1: extractive answer<br/>ready in &lt;60ms<br/>grounded by construction"]
-    R -.-> G["Tier 2: Groq generation<br/>477–1573ms TTFT"]
-    G --> V{"grounding check<br/>token containment vs. cited passages"}
-    V -->|pass| REPLACE["replaces Tier 1 in UI"]
-    V -->|fail| KEEP["Tier 1 kept<br/>'generative answer withheld: failed grounding check'"]
-    T1 --> USER(["user already has an answer"])
-    REPLACE --> USER
-    KEEP --> USER
+> **A correction, reported.** The first run scored `metadata-aware` first on MRR and *last* on
+> recall. That was a defect in my metric: `query_id` is shared across language shards, so a Hindi
+> query's gold set also contained its Tamil translation — the metric was rewarding cross-lingual
+> retrieval nobody wants. Restricting gold to the query's language + English moved recall@20 from
+> 0.165 → 0.410.
 
-    style T1 fill:#1c4d33,color:#fff,stroke:#4ade80
-    style G fill:#3b1c4d,color:#fff,stroke:#A78BFA
-    style KEEP fill:#4d1c1c,color:#fff,stroke:#f87171
-```
+### Reranking · both axes, or it doesn't ship
 
-> **Generation failing is a normal state in this system, not an error.**
+| config | MRR@10 | ΔMRR | rerank p50 |
+|---|---:|---:|---:|
+| baseline | 0.1954 | — | — |
+| **+ cross-encoder top-10** | 0.3127 | **+60.0%** | 561 ms |
+| + cross-encoder top-20 | 0.3903 | **+99.8%** | 1335 ms |
+| + cross-encoder top-50 | 0.4228 | +116.4% | 4073 ms |
 
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
+MRR **doubles** at depth 20 — the largest retrieval gain in this project. And even depth 10 is
+**2.8× the entire answer SLO**, so it is structurally excluded from Tier 1 and runs in Tier 2 only,
+off by default, per-request togglable.
 
-## 📚 The corpus
+> A microbenchmark on short synthetic strings said 122 ms at depth 10. Real 59-word corpus passages
+> cost **561 ms** — 4.6× more. Trusting the first number would have broken the headline silently.
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Passages-310,582-A78BFA?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Languages-5-22d3ee?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Source-ai4bharat%2FMSMARCO--XI-4ade80?style=for-the-badge" />
-</p>
+### Scope gate · a negative result worth more than a fake threshold
 
-```
-hi  ██████████  62,198
-en  ██████████  62,307
-gu  ██████████  62,069
-bn  ██████████  62,183
-ta  █████████░  61,825
-```
+Four abstention signals compared by ROC-AUC on 500 in-domain vs 70 authored out-of-domain probes:
 
-<table>
-<tr><th>Decision</th><th>Why it was measured, not assumed</th></tr>
-<tr><td><b>Validation split, not train</b></td><td>Same <code>is_selected</code> labels at ~470MB vs. ~3.7GB — an eighth the download for identical evaluation value</td></tr>
-<tr><td><b>Sampled 1-in-16 by hashed <code>query_id</code></b></td><td>Same queries selected across every language → cross-lingual comparison is valid; <b>37.9% dedupe rate</b> confirmed the hashing worked</td></tr>
-<tr><td><b>Translation-degeneration filter at 0.5</b></td><td>At 0.3 the filter over-triggers <b>40× more</b> on legitimate text for zero extra bad queries caught — the threshold was chosen from the curve, not a guess</td></tr>
-</table>
+| signal | AUC | τ @95% OOD | real queries refused |
+|---|---:|---:|---:|
+| top-1 cosine | 0.713 | 0.7676 | **78.8%** |
+| coverage | 0.520 | — | ~chance |
+| top1 × margin | 0.493 | — | ~chance |
+| margin | 0.437 | — | **below** chance |
 
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
+**Every embedding-derived signal failed.** The "peakedness" hypothesis — that answerable queries
+have one distinctly best passage — is *refuted*. The reason is structural: they all answer *"is
+there topically related text here"*, while the gate needs *"is this even a question this corpus can
+answer"*.
 
-## 🧪 Chunking lab
+What worked is grammatical, not semantic: **80.0% OOD rejection at 0.025% false refusals** (1 in
+4,000), firing in 0.1 ms before retrieval runs.
 
-Six strategies, **scored** against real relevance labels — not asserted.
+### Corpus size · precision vs breadth
 
-| strategy | MRR@10 | R@5 | R@10 | R@20 | p50 ms |
-|---|---:|---:|---:|---:|---:|
-| 🏆 **metadata-aware** | **0.2939** | **0.247** | **0.3315** | **0.4095** | 0.157 |
-| parent-child | 0.2687 | 0.2165 | 0.2955 | 0.357 | 0.598 |
-| sentence-window | 0.2667 | 0.219 | 0.3005 | 0.346 | 0.444 |
-| passage-native | 0.2585 | 0.2085 | 0.2765 | 0.335 | 0.147 |
-| semantic-boundary | 0.2563 | 0.218 | 0.291 | 0.3435 | 0.204 |
-| fixed-256-64 *(naive baseline)* | 0.2505 | 0.2065 | 0.272 | 0.3355 | 0.199 |
-
-> **`metadata-aware` ships** — wins every quality metric while being the *second-fastest* strategy. No quality/latency trade to negotiate.
-
-<details>
-<summary><b>🔧 The correction we found and fixed mid-lab (click to expand)</b></summary>
-
-<br>
-
-The first run scored `metadata-aware` #1 on MRR@10 and **last** on recall@20 (0.165) — a defect in the evaluation, not the strategy. `query_id` is shared across language shards, so a Hindi query's raw qrels also marked its Gujarati/Bengali/Tamil translations relevant, rewarding cross-language leakage. Restricting ground truth to the query's own language + English moved recall@20 from **0.165 → 0.410**, applied identically to all six strategies.
-
-</details>
-
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
-
-## 🛡️ Guardrails
-
-| gate | mechanism |
-|---|---|
-| 🎯 **scope** | τ on top dense cosine — **reports itself uncalibrated** rather than shipping a threshold with 14%+ false-refusal rate |
-| 🛑 **safety** | fast pattern screen on the transcript, before retrieval — a refusal costs nothing |
-| ⚓ **grounding** | Tier 1 grounded by construction; Tier 2 verified by token containment, not an LLM judge |
-| 💉 **injection** | retrieved passages wrapped as data, never interpolated as instructions |
-
-## 📉 Scope-gate calibration — a negative result, reported
-
-```
-in-domain   p05=0.5639  p50=0.7036  p95=0.8367
-out-domain  p05=0.4968  p50=0.6132  p95=0.7621
-```
-
-| signal | AUC | @95% OOD rejection: in-domain wrongly refused |
+| index size | MRR@10 | vs 6k |
 |---|---:|---:|
-| top1 cosine | **0.713** | 78.8% |
-| top1 × margin | 0.493 | 90.4% |
-| margin (top1 − mean rest) | 0.437 | 93.2% |
-| margin_top5 | 0.477 | 93.4% |
+| 6,259 | 0.1843 | — |
+| 36,259 | 0.1275 | −30.8% |
+| 310,582 | 0.0732 | **−60.3%** |
 
-**The margin hypothesis is refuted** — a static embedder maps any text to *some* moderately-scoring passage, so "distinct best match" doesn't separate answerable from unanswerable. Even the best operating point refuses **14.2%** of legitimate queries. **Nothing ships under 10% collateral damage — so nothing ships.** The next real fix is a cross-encoder or intent classifier, not a constant.
+Bigger is **worse** here: sampling is by `query_id`, so every indexed query already has all its
+relevant passages and additions are pure distractors. A 30–50k index would roughly double MRR —
+not taken, because a demo that cannot answer a judge's question is worse than one that answers at
+rank 3. The reranker recovers the gap without giving up either.
+
+---
+
+## The corpus
+
+Built from [`ai4bharat/MSMARCO-XI`](https://huggingface.co/datasets/ai4bharat/MSMARCO-XI) —
+**310,582 passages**, five languages, near-perfectly balanced.
 
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
+  <img src="https://img.shields.io/badge/hi-62,198-22d3ee?style=flat-square&labelColor=070a14" />
+  <img src="https://img.shields.io/badge/en-62,307-22d3ee?style=flat-square&labelColor=070a14" />
+  <img src="https://img.shields.io/badge/gu-62,069-22d3ee?style=flat-square&labelColor=070a14" />
+  <img src="https://img.shields.io/badge/bn-62,183-22d3ee?style=flat-square&labelColor=070a14" />
+  <img src="https://img.shields.io/badge/ta-61,825-22d3ee?style=flat-square&labelColor=070a14" />
 </p>
 
-## 🏗️ Architecture components
+Three decisions driven by measurement:
 
-| component | choice | why |
+**Validation split, not train** — ~470 MB shards vs ~3.7 GB, same `is_selected` labels.
+
+**Sampled 1-in-16 by hashed `query_id`** — the split holds 97,941 queries/language (10× my first
+projection), which would have meant ~4.75 M passages and ~4.9 GB of embeddings. Hashing `query_id`
+selects the *same* queries in every language, which is why the English passages collapsed under
+content-hash dedupe — the observed **37.9% dedupe rate** is the proof it worked.
+
+**Translation-degeneration filter** — the English query `"suit definition"` (15 chars) became a
+**7,783-character** Hindi string repeating one clause ~90 times. Prevalence measured before
+choosing a cut:
+
+| repeated-5-gram ratio | passages | queries |
+|---|---:|---:|
+| > 0.3 | 4.22% | 0.25% |
+| **> 0.5** ✅ | 0.11% | 0.25% |
+| > 0.7 | 0.00% | 0.25% |
+
+At 0.3 the filter starts eating legitimate enumerations — 40× more passages flagged for zero extra
+queries caught.
+
+---
+
+## Stack
+
+| layer | choice | why |
 |---|---|---|
-| Embeddings (fast) | `potion-multilingual-128M`, 256-dim | Model2Vec static lookup — no forward pass, µs-scale |
-| Embeddings (quality) | `multilingual-e5-small` ONNX int8 | real forward pass, lazily loaded, UI-toggleable |
-| Lexical | `bm25s` + Indic-aware tokenizer | exact tokens: names, numbers, dates |
-| Fusion | Reciprocal Rank Fusion (k=60) | scale-free — BM25 and cosine aren't commensurable |
-| Vector search | `usearch` HNSW **and** exact NumPy | corpus small enough that exact search stays a real option |
-| STT | Sarvam Saaras v3 streaming | Indic-specialist, code-mix, auto language detection |
-| Generation | Groq → Cerebras → extractive-only | circuit breaker, per-provider failover |
-| Host | Google Cloud Run | *(HF Docker Spaces now return 402 — PRO required)* |
+| STT | Sarvam Saaras v3 | Indic-specialist, code-mix, auto-detect — matches the data |
+| Embeddings | `potion-multilingual-128M` 256d | static lookup, no forward pass, **0.38 ms** |
+| Lexical | `bm25s` + Indic tokenizer | danda, combining marks, ZWJ — off-the-shelf tokenizers break here |
+| Fusion | RRF k=60 | scale-free; BM25 and cosine aren't commensurable |
+| Vector | `usearch` HNSW **+** exact NumPy | exact is a few ms at this scale, so HNSW recall is *measured* |
+| Rerank | `jina-reranker-v2` int8 ONNX | 100+ languages; bge-reranker is EN/ZH and useless on Gujarati |
+| Generation | Groq → Cerebras → extractive | circuit breaker, per-provider failover |
+| Host | Modal | *HF Docker Spaces now 402; Cloud Run needs prepay in India* |
 
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
+---
 
-## 🛠️ Tech stack
-
-<p align="center">
-  <img src="https://skillicons.dev/icons?i=python,fastapi,docker,gcp,numpy,onnx&theme=dark" />
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/uv-package_manager-DE5FE9?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/usearch-HNSW-A78BFA?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/bm25s-lexical_search-22d3ee?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Sarvam_Saaras_v3-Indic_STT-4ade80?style=for-the-badge" />
-  <img src="https://img.shields.io/badge/Groq-streamed_generation-f87171?style=for-the-badge" />
-</p>
-
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
-
-## 🚀 Quickstart
+## Run it
 
 ```bash
-git clone https://github.com/Het161/shruti.git && cd shruti
-
-uv venv --python 3.13 .venv && source .venv/bin/activate
-uv pip install -e .
-cp .env.example .env          # fill in Gemini / Groq / Sarvam keys
+uv venv --python 3.13 .venv && uv pip install -e .
+cp .env.example .env                      # fill in keys
 
 python scripts/build_corpus.py --languages hi gu bn ta --sample-1-in 16
 python scripts/embed_corpus.py --corpus data/corpus --lane fast
-
 SHRUTI_ARTIFACT_DIR=data/corpus uvicorn app.main:app --port 8080
 ```
 
-`/api/health` reports `ready: false` until a 20-query warmup completes — the service is never announced healthy while the first real query would still pay model-load cost.
-
-| endpoint | method | description |
-|---|---|---|
-| `/` | GET | web interface |
-| `/api/ask` | POST | text query → answer |
-| `/ws/voice` | WebSocket | voice query → answer |
-| `/api/health` | GET | service health (post-warmup) |
-| `/method` | GET | methodology & full results |
-
-### Benchmark it yourself
-
 ```bash
-python bench/run.py --url https://<deployed-url> --n 320
+python bench/run.py --url <deployed>      # latency percentiles
+python bench/testset.py --url <deployed>  # 84-query behavioural regression
+python lab/chunking_eval.py               # 6 strategies
+python lab/rerank_eval.py                 # ΔMRR + Δlatency
+python lab/calibrate_scope.py             # abstention signals
 ```
 
-≥300 measured queries, 20-query warmup excluded and counted separately, P50/P70/P90/P100 per stage, per language, per SLO. Artifacts land in `bench/results/`.
+---
+
+## Honest status
+
+✅ Live · 84/84 regression · 100% guardrails · mobile verified · every number reproducible from
+`bench/results/`
+
+⚠️ **Open:** BM25 is 74.5% of pipeline time and un-optimised. The e5 quality lane is rejected on
+cost (700× slower to embed) **without** its MRR number — that run was killed at 25 minutes, and the
+table says so rather than implying both halves were measured. Scope gate handles conversational
+out-of-domain well; questions about *current world state* remain the known gap.
 
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
-
-## 🎓 What we learned
-
-```
-Honest metrics > impressive metrics    — a latency claim with no definition is worthless
-Two tiers beat one slow tier           — an instant right answer beats a fluent slow one
-Trust your own scoreboard less         — our "best" strategy was winning on a broken eval
-Report the negative result             — an uncalibrated gate, said out loud, beats a fake one
-Measure before you optimise            — BM25's 87% share was tested, not assumed
-```
-
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=rect&color=0:070a14,100:070a14&height=2&width=1000" />
-</p>
-
-## 👥 Team
-
-| name | role | github |
-|---|---|---|
-| **Het Patel** | Lead Developer | [@Het161](https://github.com/Het161) |
-| **Eklavya Jha** | AI Developer | [@EklavyajhaAI07](https://github.com/EklavyajhaAI07) |
-
-> Built for **HHGoa Task #2** — Leaderboard scrapped, pure engineering evaluated. One submission per team, no re-submission. `#RAGInGoa`
-
-## 🙏 Acknowledgments
-
-**HHGoa** for the hackathon · **ai4bharat** for MSMARCO-XI · **Sarvam AI** for Saaras v3 · **Groq** for generation · **Google Cloud** for hosting
-
-<p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:1c4d33,100:0f2417&height=140&section=footer&text=Heard.%20Retrieved.%20Answered.&fontSize=26&fontColor=F1F1F3&animation=fadeIn" />
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:22d3ee,50:0e7c86,100:070a14&height=110&section=footer" />
 </p>
