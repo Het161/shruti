@@ -224,6 +224,7 @@ def evaluate(
     embedder: Any,
     *,
     build_seconds: float,
+    passage_lang: dict[str, str],
     lang_filter: bool = False,
     type_boost: bool = False,
 ) -> StrategyResult:
@@ -252,6 +253,18 @@ def evaluate(
 
     for q in queries:
         gold = relevant.get(q["query_id"], set())
+        # Restrict ground truth to the query's own language plus English.
+        #
+        # `query_id` is shared across every language shard, so the raw qrels for a Hindi query also
+        # mark its Gujarati, Bengali, and Tamil translations relevant. Scoring against that set
+        # rewards a system for returning a Tamil passage to a Hindi speaker, and punishes language
+        # filtering for correctly excluding it — which is exactly backwards. The first run of this
+        # lab showed the symptom clearly: metadata-aware led on MRR@10 while placing last on
+        # recall@20, purely because it declined to retrieve translations nobody asked for.
+        #
+        # The restriction is applied identically to every strategy, so the comparison stays fair;
+        # it changes what "relevant" means, not who is allowed to benefit from it.
+        gold = {pid for pid in gold if passage_lang.get(pid) in (q["lang"], "en")}
         if not gold:
             continue
 
@@ -347,6 +360,8 @@ def main() -> int:
     passages = [p for p in passages_all if p["passage_id"] in wanted_pids]
     log.info("indexing %d passages for the eval subset", len(passages))
 
+    passage_lang: dict[str, str] = {p["passage_id"]: p["lang"] for p in passages_all}
+
     embedder = get_embedder("fast")
 
     builders = {
@@ -379,6 +394,7 @@ def main() -> int:
                 relevant,
                 embedder,
                 build_seconds=build_s,
+                passage_lang=passage_lang,
                 lang_filter=(name == "metadata-aware"),
                 type_boost=(name == "metadata-aware"),
             )

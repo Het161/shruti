@@ -1,0 +1,90 @@
+{
+  "eval_queries": 500,
+  "indexed_passages": 6259,
+  "languages": [
+    "bn",
+    "gu",
+    "hi",
+    "ta"
+  ],
+  "k_values": [
+    5,
+    10,
+    20
+  ],
+  "results": [
+    {
+      "strategy": "metadata-aware",
+      "chunks": 6259,
+      "mean_chars": 302.4,
+      "mrr@10": 0.2939,
+      "recall@5": 0.247,
+      "recall@10": 0.3315,
+      "recall@20": 0.4095,
+      "latency_p50_ms": 0.157,
+      "latency_p100_ms": 1.5,
+      "build_s": 0.0
+    },
+    {
+      "strategy": "parent-child",
+      "chunks": 20784,
+      "mean_chars": 88.0,
+      "mrr@10": 0.2687,
+      "recall@5": 0.2165,
+      "recall@10": 0.2955,
+      "recall@20": 0.357,
+      "latency_p50_ms": 0.598,
+      "latency_p100_ms": 2.699,
+      "build_s": 0.1
+    },
+    {
+      "strategy": "sentence-window",
+      "chunks": 17046,
+      "mean_chars": 110.4,
+      "mrr@10": 0.2667,
+      "recall@5": 0.219,
+      "recall@10": 0.3005,
+      "recall@20": 0.346,
+      "latency_p50_ms": 0.444,
+      "latency_p100_ms": 1.546,
+      "build_s": 0.1
+    },
+    {
+      "strategy": "passage-native",
+      "chunks": 6259,
+      "mean_chars": 302.4,
+      "mrr@10": 0.2585,
+      "recall@5": 0.2085,
+      "recall@10": 0.2765,
+      "recall@20": 0.335,
+      "latency_p50_ms": 0.147,
+      "latency_p100_ms": 5.103,
+      "build_s": 0.0
+    },
+    {
+      "strategy": "semantic-boundary",
+      "chunks": 13307,
+      "mean_chars": 141.7,
+      "mrr@10": 0.2563,
+      "recall@5": 0.218,
+      "recall@10": 0.291,
+      "recall@20": 0.3435,
+      "latency_p50_ms": 0.204,
+      "latency_p100_ms": 0.648,
+      "build_s": 0.6
+    },
+    {
+      "strategy": "fixed-256-64",
+      "chunks": 11863,
+      "mean_chars": 189.0,
+      "mrr@10": 0.2505,
+      "recall@5": 0.2065,
+      "recall@10": 0.272,
+      "recall@20": 0.3355,
+      "latency_p50_ms": 0.199,
+      "latency_p100_ms": 0.637,
+      "build_s": 0.0
+    }
+  ],
+  "measured_at_unix": 1786616725
+}

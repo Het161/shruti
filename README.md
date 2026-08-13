@@ -174,11 +174,34 @@ present — sampling passages directly would delete correct answers and score ev
 an unreachable ceiling. Chunks are collapsed to parent passages before scoring, so a sentence-level
 index and a passage-level one are compared on the same footing.
 
+### Results — 500 eval queries, 6,259 passages, hi/gu/bn/ta
+
+| strategy | chunks | mean chars | MRR@10 | R@5 | R@10 | R@20 | p50 ms |
+|---|---|---|---|---|---|---|---|
+| **metadata-aware** | 6,259 | 302 | **0.2939** | **0.247** | **0.3315** | **0.4095** | 0.157 |
+| parent-child | 20,784 | 88 | 0.2687 | 0.2165 | 0.2955 | 0.357 | 0.598 |
+| sentence-window | 17,046 | 110 | 0.2667 | 0.219 | 0.3005 | 0.346 | 0.444 |
+| passage-native | 6,259 | 302 | 0.2585 | 0.2085 | 0.2765 | 0.335 | 0.147 |
+| semantic-boundary | 13,307 | 142 | 0.2563 | 0.218 | 0.291 | 0.3435 | 0.204 |
+| fixed-256-64 | 11,863 | 189 | 0.2505 | 0.2065 | 0.272 | 0.3355 | 0.199 |
+
+**`metadata-aware` is the shipped configuration** — it wins every quality metric while being the
+second-fastest strategy, so there is no quality/latency trade to negotiate. `fixed-256-64`, the
+naive baseline, places last on MRR@10 exactly as expected.
+
+**A correction worth reporting.** The first run of this lab scored `metadata-aware` first on MRR@10
+and *last* on recall@20 (0.165). That was a defect in the evaluation, not the strategy: `query_id`
+is shared across language shards, so a Hindi query's raw qrels also mark its Gujarati, Bengali, and
+Tamil translations relevant. The metric was rewarding systems for returning a Tamil passage to a
+Hindi speaker and punishing language filtering for correctly declining to. Restricting ground truth
+to the query's own language plus English — applied identically to all six strategies — moved
+`metadata-aware`'s recall@20 from 0.165 to 0.410 and made it win outright.
+
 ```bash
 python lab/chunking_eval.py --corpus data/corpus --queries 500
 ```
 
-Results: [`bench/results/chunking_lab.json`](bench/results/) and the **/method** page.
+Full artifact: [`bench/results/chunking_lab.json`](bench/results/), also rendered on **/method**.
 
 ---
 
