@@ -238,6 +238,12 @@ class Pipeline:
 
         with timer.stage("guard_safety"):
             safety = guards.check_safety(req.text)
+            # Conversational-intent screen runs alongside safety, before any retrieval. Measured at
+            # 80% out-of-domain rejection for 0.05% false refusals (1 in 2000 real queries) — the
+            # only gate that separates, after three retrieval-derived signals failed to. See
+            # lab/calibrate_scope.py.
+            if safety.allowed:
+                safety = guards.check_conversational(req.text)
 
         if not safety.allowed:
             return AskResponse(

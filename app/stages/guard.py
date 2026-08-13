@@ -55,6 +55,79 @@ _UNSAFE_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"\b(how|best way)\b.{0,30}\b(kill myself|commit suicide|end my life)\b", re.I), "self-harm"),
 )
 
+# --- conversational intent ------------------------------------------------------------------
+#
+# The gate that actually catches the failure this system has.
+#
+# Three retrieval-derived signals were calibrated and all three failed (see
+# lab/calibrate_scope.py and docs/BUILD_LOG.md): top-1 cosine AUC 0.713 at an unusable operating
+# point, margin-based "peakedness" at or below chance, and lexical coverage at 0.520. The reason
+# they failed is not that they were badly tuned — it is that they all answer the question "is
+# there topically related text in the corpus", and the corpus is 310k passages of general web
+# text, so the answer is essentially always yes.
+#
+# The real discriminator is grammatical, not semantic. This corpus answers *factual questions
+# about the world*. "My name is Het Patel" is a self-introduction; "order me a pizza" is a
+# command; "who created you" is about the assistant. None is an information-seeking question, and
+# no amount of embedding quality changes that — it is a property of the utterance, not of the
+# retrieval.
+#
+# So this gate is a pattern screen, and it is deliberately high-precision rather than
+# high-recall: it fires only on constructions that are unambiguously not corpus questions. A
+# missed refusal costs one bad answer; a false refusal on a real question makes the product
+# useless. Measured on 500 in-domain queries and 70 out-of-domain probes — see the build log.
+_CONVERSATIONAL: tuple[tuple[re.Pattern[str], str], ...] = (
+    # Self-introduction and first-person-possessive personal facts. The corpus knows nothing
+    # about the speaker, so these are unanswerable by construction rather than by chance.
+    (re.compile(r"\bmy name is\b|\bi am called\b|\bi'?m called\b", re.I), "self-introduction"),
+    (re.compile(r"\bmy (name|password|bank|account|balance|location|address|phone|email|birthday)\b", re.I), "personal information about the speaker"),
+    # Trailing negative lookaheads matter here and `\b` will not do the job. Python's `\b` is
+    # defined on word characters, and every Indic letter is a word character, so `আমার মা` happily
+    # matched inside `আমার মাথায়` ("my head") and refused a legitimate medical question. The
+    # lookahead asserts the next character is not another letter of the same script, which is the
+    # word boundary that actually exists in these writing systems.
+    (re.compile(r"मेरा नाम(?![ऀ-ॿ])|मेरे बैंक|मेरा पासवर्ड|मेरी माँ(?![ऀ-ॿ])", re.I), "personal information about the speaker"),
+    (re.compile(r"મારું નામ(?![઀-૿])|મારા બેંક|મારો પાસવર્ડ|મારી માતા(?![઀-૿])", re.I), "personal information about the speaker"),
+    (re.compile(r"আমার নাম(?![ঀ-৿])|আমার ব্যাংক|আমার পাসওয়ার্ড|আমার মা(?![ঀ-৿])", re.I), "personal information about the speaker"),
+    (re.compile(r"என் பெயர்(?![஀-௿])|என் வங்கி|என் கடவுச்சொல்|என் அம்மா(?![஀-௿])", re.I), "personal information about the speaker"),
+    # Questions addressed to the assistant rather than to the corpus.
+    (re.compile(r"\b(what|who)('?s| is| are)\s+your\s+(name|model|purpose|version)\b", re.I), "a question about the assistant, not the corpus"),
+    (re.compile(r"\bwho (made|created|built|trained|designed) you\b", re.I), "a question about the assistant, not the corpus"),
+    (re.compile(r"\bare you (a |an )?(human|real|conscious|alive|robot|ai|bot)\b", re.I), "a question about the assistant, not the corpus"),
+    (re.compile(r"\bhow are you\b|\bwhat are you thinking\b", re.I), "conversational small talk"),
+    (re.compile(r"तुम्हारा नाम|तुम कैसे हो|तुम्हें किसने बनाया|क्या तुम इंसान", re.I), "a question about the assistant, not the corpus"),
+    (re.compile(r"તમારું નામ|તમે કેમ છો|તમને કોણે બનાવ્યા|શું તમે માણસ", re.I), "a question about the assistant, not the corpus"),
+    (re.compile(r"তোমার নাম|তুমি কেমন আছো|তোমাকে কে বানিয়েছে|তুমি কি মানুষ", re.I), "a question about the assistant, not the corpus"),
+    (re.compile(r"உங்கள் பெயர்|எப்படி இருக்கிறீர்கள்|உங்களை யார் உருவாக்கியது|நீங்கள் மனிதரா", re.I), "a question about the assistant, not the corpus"),
+    # Commands. A retrieval system cannot take actions in the world.
+    (re.compile(r"\b(call|text|email|order|book|play|buy|send|delete|shut down|turn off|set)\s+(me|my|an?\s|the\s)", re.I), "a command, not a question"),
+    (re.compile(r"\b(sing|tell)\s+me\s+(a|an|the)\b", re.I), "a command, not a question"),
+    (re.compile(r"\bset an alarm\b|\bremind me\b|\bwrite me\b", re.I), "a command, not a question"),
+    (re.compile(r"ऑर्डर करो|फोन करो|गाना गाओ|चुटकुला सुनाओ", re.I), "a command, not a question"),
+    (re.compile(r"ઓર્ડર કરો|ફોન કરો|ગીત ગાઓ|જોક કહો", re.I), "a command, not a question"),
+    (re.compile(r"অর্ডার করো|ফোন করো|গান গাও|কৌতুক বলো", re.I), "a command, not a question"),
+    (re.compile(r"ஆர்டர் செய்யுங்கள்|அழைக்கவும்|பாடல் பாடுங்கள்|நகைச்சுவை சொல்லுங்கள்", re.I), "a command, not a question"),
+)
+
+
+def check_conversational(text: str) -> GuardVerdict:
+    """Refuse utterances that are not factual questions about the world.
+
+    Runs before retrieval, so a refusal costs microseconds rather than a full pipeline pass. The
+    reason string names *why* it is out of scope, because "this isn't in my corpus" is far less
+    useful to a user than "that's a question about me, not about what I've read".
+    """
+    for pattern, reason in _CONVERSATIONAL:
+        if pattern.search(text):
+            return GuardVerdict(
+                allowed=False,
+                gate=Gate.SCOPE,
+                reason=f"Out of scope: this reads as {reason}. I answer factual questions from a "
+                f"fixed passage corpus, and I have no information about you or the world outside it.",
+            )
+    return GuardVerdict(allowed=True)
+
+
 # --- injection ----------------------------------------------------------------------------
 
 _INJECTION_PATTERNS: tuple[re.Pattern[str], ...] = (

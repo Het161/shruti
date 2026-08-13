@@ -339,7 +339,11 @@ async function startVoice() {
   await audioCtx.audioWorklet.addModule("/audio-worklet.js");
 
   const proto = location.protocol === "https:" ? "wss:" : "ws:";
-  ws = new WebSocket(`${proto}//${location.host}/ws/voice`);
+  /* Forward the chosen STT language. Auto-detect frequently transliterates Indian-accented
+   * English into Devanagari — "My name is Het Patel" came back as "भेद पाडेल" — and only the
+   * speaker knows which language is about to be spoken. */
+  const sttLang = encodeURIComponent($("sttlang").value || "unknown");
+  ws = new WebSocket(`${proto}//${location.host}/ws/voice?lang=${sttLang}`);
   ws.binaryType = "arraybuffer";
 
   ws.onmessage = (ev) => {

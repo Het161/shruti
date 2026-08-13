@@ -342,3 +342,75 @@ genuine compute on a slower CPU.
 It is the obvious next optimisation — smaller `lexical_top_k`, a faster scoring backend, or
 language-partitioned BM25 indexes. It is published as-is rather than tuned away first, because the
 target is met without it and the honest number is more useful than a flattering one.
+
+---
+
+## Scope gate: three failed hypotheses, then the one that worked
+
+Prompted by a live failure. Spoken input "My name is Het Patel" was transcribed as "भेद पाडेल."
+and the system **answered it** — returning passages about autism spectrum disorders. Confidently
+wrong is a worse failure than slow, and this is exactly the case the task's "knows when not to
+answer" requirement is about.
+
+### What was tried, and what it measured
+
+500 in-domain queries against 70 authored out-of-domain probes across five languages, compared by
+ROC-AUC (the probability a random answerable query outscores a random unanswerable one).
+
+| signal | AUC | verdict |
+|---|---|---|
+| top-1 dense cosine | 0.713 | separates weakly; 95% rejection costs **78.8%** of real queries |
+| coverage (query terms present in top passages) | 0.520 | ~chance |
+| top1 × margin | 0.493 | ~chance |
+| margin_top5 | 0.477 | below chance |
+| margin (top1 − mean of rest) | 0.437 | below chance |
+
+Two hypotheses were refuted outright:
+
+- **Peakedness.** The idea that an answerable query has one distinctly best passage while an
+  unanswerable one faces a flat field. All three margin variants land at or below chance.
+- **Lexical coverage.** The idea that an unanswerable query's terms are absent from the retrieved
+  passages. This corpus is 310k passages of general web text, so common words — "name", "time",
+  "weather", "pizza" — appear *somewhere* regardless. AUC 0.520.
+
+The shared reason they failed is worth stating precisely: **all three answer "is there topically
+related text in the corpus", and the question the gate needs answered is "is this even a question
+this corpus could answer".** A better embedding would not have helped, because the mismatch is not
+in embedding quality.
+
+### What worked: conversational-intent screening
+
+The real discriminator is grammatical, not semantic. This corpus answers *factual questions about
+the world*. "My name is Het Patel" is a self-introduction, "order me a pizza" is a command, "who
+created you" is about the assistant. None is an information-seeking question, and that is a
+property of the utterance rather than of the retrieval.
+
+A pattern screen across all five languages, deliberately tuned for precision over recall:
+
+| metric | result |
+|---|---|
+| out-of-domain rejected | **80.0%** (56/70) |
+| false refusals on real queries | **0.025%** (1 / 4000) |
+| cost per refusal | 0.04–0.28ms (fires before retrieval) |
+
+Compare the cosine gate at a comparable rejection rate: 78.8% of real queries refused. This is a
+3000× improvement in collateral damage.
+
+A precision bug surfaced during measurement: `আমার মা` ("my mother") prefix-matched inside
+`আমার মাথায়` ("my head") and refused a legitimate medical question. Python's `\b` is defined on
+word characters and every Indic letter is one, so `\b` does nothing here — fixed with negative
+lookaheads asserting the next character is not another letter of the same script.
+
+The 14 remaining misses are questions about *current world state* — time, weather, elections. Those
+are genuinely questions, just not ones a static passage corpus can answer, and catching them needs
+a different mechanism. Reported rather than papered over.
+
+### STT: two separate bugs
+
+- **`high_vad_sensitivity` was hardcoded `true`.** Eager voice-activity segmentation clips the
+  start of an utterance, because the first syllable is what convinces the detector speech began.
+  "My name is Het Patel" lost its opening entirely. Now defaults to `false`.
+- **Auto-detect picks Hindi for Indian-accented English.** The audio was not corrupted — "भेद
+  पाडेल" is phonetically close to "Het Patel" — Saaras simply chose Devanagari. No server-side fix
+  exists for this: only the speaker knows what language they are about to use. The UI now offers an
+  explicit language selector, defaulting to auto.

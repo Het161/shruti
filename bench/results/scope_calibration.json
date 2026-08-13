@@ -33,6 +33,22 @@
       "in_domain_refused": 0.904,
       "in_p50": 0.053027749887633036,
       "ood_p50": 0.05475103224951283
+    },
+    "coverage": {
+      "auc": 0.5201428571428571,
+      "tau_at_target": 1.0,
+      "ood_rejected": 0.9285714285714286,
+      "in_domain_refused": 0.934,
+      "in_p50": 0.5419580419580419,
+      "ood_p50": 0.5
+    },
+    "coverage_x_top1": {
+      "auc": 0.5709428571428572,
+      "tau_at_target": 0.6367271145184835,
+      "ood_rejected": 0.9571428571428572,
+      "in_domain_refused": 0.904,
+      "in_p50": 0.37846823249544415,
+      "ood_p50": 0.3403842508792877
     }
   },
   "operating_points": [

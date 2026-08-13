@@ -45,6 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.corpus import Corpus
 from app.stages.embed import get_embedder
 from app.stages.lang import retrieval_langs
+from app.stages.lexical import tokenize
 
 log = logging.getLogger("calibrate_scope")
 
@@ -116,20 +117,47 @@ def signals(corpus: Corpus, embedder: object, text: str, lang: str, k: int = 20)
     """
     vec = embedder.encode_query(text)  # type: ignore[attr-defined]
     mask = corpus.mask_for_langs(retrieval_langs(lang))
-    _rows, scores = corpus.exact_search(vec, k, mask=mask)
+    rows, scores = corpus.exact_search(vec, k, mask=mask)
+    keys = ("top1", "margin", "margin_top5", "top1_x_margin", "coverage", "coverage_x_top1")
     if scores.size == 0:
-        return dict.fromkeys(("top1", "margin", "margin_top5", "top1_x_margin"), -1.0)
+        return dict.fromkeys(keys, -1.0)
 
     top1 = float(scores[0])
     rest = scores[1:]
     margin = top1 - float(rest.mean()) if rest.size else 0.0
     rest5 = scores[1:6]
     margin_top5 = top1 - float(rest5.mean()) if rest5.size else 0.0
+
+    # `coverage` — the fraction of the query's content terms that literally appear in the passages
+    # that would be used to answer it.
+    #
+    # Added after the first round of this experiment showed every embedding-derived signal failing.
+    # The reason those failed is that cosine measures *topical proximity*, and the question the gate
+    # actually needs answered is "is the evidence for this query present in the corpus at all". Those
+    # are different questions, which is why a better embedding would not have fixed it.
+    #
+    # Coverage asks the second question directly, and it is a grounding test rather than a
+    # similarity test: "My name is Het Patel" shares no content term with a passage about autism
+    # spectrum disorders, while "કોર્પોરેશન શું છે" shares its one load-bearing term with the
+    # passages that answer it. Stopwords are already stripped by the shared tokeniser, so
+    # question-words do not inflate the score.
+    top_texts = [corpus.text_at(int(r)) for r in rows[:3]]
+    q_tokens = set(tokenize(text))
+    if q_tokens:
+        passage_tokens: set[str] = set()
+        for t in top_texts:
+            passage_tokens |= set(tokenize(t))
+        coverage = len(q_tokens & passage_tokens) / len(q_tokens)
+    else:
+        coverage = 0.0
+
     return {
         "top1": top1,
         "margin": margin,
         "margin_top5": margin_top5,
         "top1_x_margin": top1 * margin,
+        "coverage": coverage,
+        "coverage_x_top1": coverage * top1,
     }
 
 

@@ -89,9 +89,19 @@ class SarvamStream:
         sample_rate: int = 16000,
         model: str = "saaras:v3",
         vad_signals: bool = True,
+        high_vad_sensitivity: bool = False,
     ) -> None:
         self.api_key = api_key
         self.sample_rate = sample_rate
+        self.language_code = language_code
+        # `high_vad_sensitivity` defaults to False now, and this was a real bug rather than a
+        # preference. It was hardcoded to True, which makes the voice-activity detector segment
+        # eagerly — and eager segmentation clips the beginning of an utterance, because the first
+        # syllable is what convinces the detector speech has started.
+        #
+        # Observed: "My name is Het Patel" came back as just the tail of the phrase. The audio was
+        # not corrupted (the transcript is phonetically close to "Het Patel"), the front of it was
+        # simply never sent for recognition.
         self._query = urlencode(
             {
                 "model": model,
@@ -99,7 +109,7 @@ class SarvamStream:
                 "sample_rate": str(sample_rate),
                 "language-code": language_code,
                 "vad_signals": "true" if vad_signals else "false",
-                "high_vad_sensitivity": "true",
+                "high_vad_sensitivity": "true" if high_vad_sensitivity else "false",
             }
         )
         self._ws: websockets.ClientConnection | None = None

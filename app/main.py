@@ -294,8 +294,16 @@ async def voice(ws: WebSocket) -> None:
         await ws.close()
         return
 
+    # Language override. Auto-detection is right for a multilingual demo in principle, but in
+    # practice Saaras hears Indian-accented English and frequently picks Hindi, so "My name is Het
+    # Patel" comes back transliterated into Devanagari. That is a reasonable guess by the model and
+    # the wrong answer for the user, and no amount of server-side cleverness fixes it — only the
+    # speaker knows which language they are about to speak. So the UI offers the choice and
+    # defaults to auto.
+    requested_lang = ws.query_params.get("lang") or "unknown"
+
     try:
-        async with SarvamStream(settings.sarvam_api_key) as stt:
+        async with SarvamStream(settings.sarvam_api_key, language_code=requested_lang) as stt:
 
             async def pump_from_sarvam() -> None:
                 """Forward transcripts to the browser; on final, run the pipeline."""
