@@ -278,3 +278,67 @@ this traffic volume, and it runs the same Dockerfile unmodified.
   Replaced with a boolean mask applied to the score vector.
 - `Pipeline.ask` embedded the query a second time for the extractive stage instead of reusing the
   vector already computed in `retrieve`.
+
+---
+
+## D1 (end) — deployed, benchmarked from two continents
+
+**Live: https://hetpatelsk--shruti-fastapi-app.modal.run**
+
+### Host, third attempt
+
+| target | outcome |
+|---|---|
+| HF Docker Space | HTTP 402 — Docker Spaces now require PRO |
+| Google Cloud Run | blocked: billing account `OPEN: False`, and `FAILED_PRECONDITION: Billing account for project not found`. Indian free-trial accounts must prepay first |
+| **Modal** | deployed |
+
+Cloud Run was confirmed blocked by attempting it, not inferred from the console banner. With the
+submission due on the 19th, waiting 24 hours for a payment to clear was the wrong risk.
+
+The pivot cost one file. `deploy/modal_app.py` wraps `app.main:app` unchanged — same FastAPI
+object, same pipeline, same endpoints. That is the return on having kept hosting concerns out of
+the application.
+
+### Uploading 822 MB over a 3 MB/s link doesn't work
+
+Two attempts at `modal volume put` died on dropped SSL connections. Rather than retry, the
+artifact job was restructured: `populate_artifacts` now downloads only the *source* artifacts
+from HF (which Modal reaches at datacenter speed) and **builds the derived indexes in-container** —
+HNSW in ~44s, BM25 in ~20s. That trades 530 MB of flaky upload for ~65s of compute, and has the
+side benefit that indexes are always built by the same code version that serves them.
+
+### Results
+
+300 queries, 20-query warmup excluded, Tier 2 off, run from both Gujarat and a US GitHub runner
+against the same deployment.
+
+| SLO | P50 | P100 |
+|---|---|---|
+| **server_side_ms** | 69.14 | **122.77** |
+| pipeline_ms | 54.46 | 60.80 |
+| client_observed — US runner | 154.01 | 241.84 |
+| client_observed — India | 345.05 | 1476.40 |
+| network — US runner | 85.89 | 155.92 |
+| network — India | 278.26 | 1408.53 |
+
+**200ms P100 target (server-side): MET at 122.77ms.** 300/300 answered, 0 errors.
+
+The two runs agree on the server-side figure (116.89 from India, 122.77 from the US) because it is
+the server's own clock. Only the network column moves: 278ms versus 86ms. That gap is the Pacific,
+and the reason the SLO was defined server-side on day one instead of discovered to be impossible on
+day five.
+
+Cold start, measured separately: **21.9s** on a genuinely cold container, 14.6s on a fresh one after
+a forced restart. Never folded into query latency.
+
+### BM25 is now the bottleneck, and it is not a page fault
+
+`bm25` measures **47ms of the 54ms pipeline — 87%** on deployed hardware, against ~2ms locally on
+the identical 310k corpus. The page-fault hypothesis was tested by forcing the index RAM-resident
+(`mmap=False`, matching the embedding matrix and HNSW graph); it changed nothing. So this is
+genuine compute on a slower CPU.
+
+It is the obvious next optimisation — smaller `lexical_top_k`, a faster scoring backend, or
+language-partitioned BM25 indexes. It is published as-is rather than tuned away first, because the
+target is met without it and the honest number is more useful than a flattering one.
