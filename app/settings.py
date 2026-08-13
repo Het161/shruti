@@ -48,10 +48,27 @@ class Settings(BaseSettings):
     rrf_k: int = Field(default=60, alias="SHRUTI_RRF_K")
 
     # --- guardrails ------------------------------------------------------------------
-    # Abstention threshold on the top fused score. `None` until calibrated on D3 against an
-    # out-of-domain probe set — a guessed threshold is worse than an explicitly uncalibrated one,
-    # because it looks calibrated.
-    scope_tau: float | None = Field(default=None, alias="SHRUTI_SCOPE_TAU")
+    # Weak-retrieval threshold on the top dense cosine.
+    #
+    # Chosen cost-first rather than recall-first, and the distinction is the whole reason a usable
+    # number exists. Asking "what threshold rejects 95% of out-of-domain queries" produced 0.7676,
+    # which also refuses 78.8% of real ones — useless. Asking instead "what am I willing to lose"
+    # and fixing that at 5% gives the 5th percentile of the in-domain score distribution, 0.5701:
+    #
+    #   in-domain cost    tau      out-of-domain rejected
+    #   1%                0.5048   7.1%
+    #   2%                0.5418   12.9%
+    #   5%                0.5701   24.3%   <- shipped
+    #   10%               0.5987   41.4%
+    #
+    # This is not an out-of-domain detector and is not claimed to be one — `check_conversational`
+    # does that job at 80% for 0.025% cost. This is the second layer, for utterances that ARE
+    # genuine questions but concern something the corpus has no strong evidence about. It reads as
+    # "refuse when retrieval lands in the weakest 5% of what normal queries produce".
+    #
+    # Motivating case: "તાપમાન કેટલું છે નિકોલ અમદાવાદમાં?" retrieved at 0.424 — below the 1st
+    # percentile — and was answered with Palm Harbor city populations and Nicole Brown Simpson.
+    scope_tau: float | None = Field(default=0.5701, alias="SHRUTI_SCOPE_TAU")
 
     # --- timeouts (milliseconds) -----------------------------------------------------
     # Every external call is bounded. On breach the pipeline degrades to a lower tier and logs the

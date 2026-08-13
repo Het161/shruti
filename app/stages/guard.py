@@ -181,7 +181,12 @@ def check_scope(top_dense_score: float | None, tau: float | None) -> GuardVerdic
         return GuardVerdict(
             allowed=False,
             gate=Gate.SCOPE,
-            reason="This isn't in my corpus — the closest passages aren't relevant enough to answer from.",
+            reason=(
+                "The corpus has no strong match for this. Retrieval scored "
+                f"{top_dense_score:.3f} against a floor of {tau:.3f} — the weakest 5% of what "
+                "normal questions produce — so answering would mean guessing from loosely "
+                "related passages."
+            ),
             score=top_dense_score,
             threshold=tau,
         )

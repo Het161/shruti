@@ -414,3 +414,64 @@ a different mechanism. Reported rather than papered over.
   पाडेल" is phonetically close to "Het Patel" — Saaras simply chose Devanagari. No server-side fix
   exists for this: only the speaker knows what language they are about to use. The UI now offers an
   explicit language selector, defaulting to auto.
+
+---
+
+## Second live failure: a real question about an absent entity
+
+"તાપમાન કેટલું છે નિકોલ અમદાવાદમાં?" ("what is the temperature in Nikol, Ahmedabad?") was answered
+with Palm Harbor city populations and a passage about Nicole Brown Simpson — "નિકોલ" matched
+*Nicole*. The conversational gate correctly let it through: it **is** a question.
+
+### The obvious fix was measured and rejected
+
+The tempting move is to refuse weather and time questions outright. Measured against 25,100 real
+corpus queries first:
+
+| pattern family | share of REAL queries it would refuse |
+|---|---|
+| any weather/temperature term | **1.845%** |
+| present-time deixis (today / now) | 0.327% |
+| "what time is it" | 0.032% |
+
+The corpus genuinely contains `तापमान सियोल में`, `तापमान महीना मुंबई`, `સૂર્યાસ્તનો સમય`. Blanket
+topic-refusal would have broken nearly 2% of answerable traffic to fix one query. Rejected.
+
+### Reframing: the question type was never the problem
+
+The screenshot's own numbers gave it away — the top dense scores were **0.424** and 0.406, against
+an in-domain p50 of 0.7036 and p05 of 0.5639. That retrieval was in the weakest 1% the system ever
+produces, and it answered anyway.
+
+So the second gate is not an out-of-domain detector. It is a **weak-retrieval floor**, and the
+threshold is chosen **cost-first**: fix what we are willing to lose, then report what it catches.
+That inversion is what made a usable number exist at all — asking "what rejects 95% of
+out-of-domain" gave 0.7676 and 78.8% collateral, while asking "what costs 5%" gives:
+
+| in-domain cost | tau | out-of-domain rejected |
+|---|---|---|
+| 1% | 0.5048 | 7.1% |
+| 2% | 0.5418 | 12.9% |
+| **5%** | **0.5701** | **24.3%** |
+| 10% | 0.5987 | 41.4% |
+
+**Shipped: τ = 0.5701**, the 5th percentile of the in-domain score distribution. It reads as
+"refuse when retrieval lands in the weakest 5% of what normal questions produce."
+
+### The two layers together
+
+| gate | catches | costs |
+|---|---|---|
+| conversational intent | 80.0% of out-of-domain probes | 0.025% false refusals |
+| weak-retrieval floor τ=0.5701 | 24.3% of out-of-domain probes | 5% by construction |
+
+### Residual limitation, stated
+
+The failing query refuses at 0.424 — but the *correctly spelled* form of the same unanswerable
+question ("તાપમાન" rather than the STT's "તપમાન") scores 0.614 and would still be answered. The
+floor catches this instance because the transcription was degraded, not because the system knows
+Nikol is absent from the corpus. Closing that properly needs entity-level evidence checking, not a
+score threshold.
+
+Both scores are now shown on every answered query as a badge — `score 0.730 / floor 0.570` — because
+a gate visible only when it fires is indistinguishable from no gate.

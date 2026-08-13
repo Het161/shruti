@@ -52,7 +52,7 @@ async function loadHealth() {
     ].join(" &nbsp;·&nbsp; ");
 
     $("status2").innerHTML = health.ready
-      ? `scope gate <b>uncalibrated</b> &nbsp;·&nbsp; no threshold separates in- from out-of-domain on this corpus without refusing &gt;10% of real queries — see <a href="/method.html" style="color:var(--trace)">Method</a>`
+      ? `two-layer abstention &nbsp;·&nbsp; intent screen <b>80%</b> of out-of-domain at <b>0.025%</b> false refusals, plus a weak-retrieval floor at <b>τ=0.5701</b> (in-domain p05) &nbsp;·&nbsp; <a href="/method.html" style="color:var(--trace)">Method</a>`
       : `<b style="color:var(--refuse)">warming up — first query pays model load</b>`;
 
     $("mic").disabled = !p.sarvam;
@@ -181,8 +181,10 @@ function renderAnswer(d) {
     [`search ${d.search_mode}`, false],
     [`${d.passages.length} passages`, false],
   ];
-  if (d.guard.reason && d.guard.reason.includes("uncalibrated")) {
-    badges.push(["scope gate uncalibrated", false]);
+  /* Show the retrieval score against the floor on every answered query, not only on refusals.
+   * A gate you can only see when it fires is indistinguishable from no gate at all. */
+  if (d.guard.score != null && d.guard.threshold != null) {
+    badges.push([`score ${d.guard.score.toFixed(3)} / floor ${d.guard.threshold.toFixed(3)}`, false]);
   }
   for (const [text, accent] of badges) {
     const s = document.createElement("span");
