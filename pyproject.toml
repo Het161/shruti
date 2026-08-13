@@ -1,0 +1,67 @@
+[project]
+name = "shruti"
+version = "0.1.0"
+description = "SHRUTI — voice-first, Indic-first grounded retrieval. Heard. Retrieved. Answered — with the stopwatch showing."
+requires-python = ">=3.13,<3.14"
+
+dependencies = [
+    # --- server ---
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    "orjson>=3.10",
+    # --- retrieval (all in-process; zero network calls in the latency path) ---
+    "model2vec>=0.4",
+    "bm25s>=0.2",
+    "PyStemmer>=2.2",
+    "usearch>=2.16",
+    "numpy>=1.26,<3",
+    # --- data ---
+    "pyarrow>=17",
+    "polars>=1.12",
+    "huggingface-hub>=0.26",
+    # --- providers (used outside the retrieval path) ---
+    "httpx>=0.27",
+    "websockets>=13",
+]
+
+[project.optional-dependencies]
+# Quality embedding lane. Kept optional so the fast lane image stays small.
+quality = [
+    "onnxruntime>=1.19",
+    "tokenizers>=0.20",
+]
+dev = [
+    "ruff>=0.7",
+    "mypy>=1.13",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "matplotlib>=3.9",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_return_any = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]

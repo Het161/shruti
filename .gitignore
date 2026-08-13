@@ -1,0 +1,38 @@
+# --- secrets: never commit ---
+.env
+.env.local
+*.key
+*.pem
+
+# --- python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- corpus artifacts (shipped via HF dataset repo, never via git) ---
+data/
+artifacts/
+*.npy
+*.parquet
+!bench/results/*.parquet
+
+# --- raw dataset downloads (multi-GB, streamed then deleted) ---
+.cache/
+hf_cache/
+
+# --- node / frontend build ---
+node_modules/
+web/dist/
+
+# --- os ---
+.DS_Store
+Thumbs.db
+
+# --- local scratch ---
+scratch/
+*.log
