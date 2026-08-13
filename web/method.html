@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SHRUTI — method</title>
+<link rel="stylesheet" href="/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>◉</text></svg>">
+</head>
+<body>
+<div class="shell">
+
+  <header class="masthead">
+    <span class="wordmark">SHRUTI<span class="dev">·</span></span>
+    <span class="tagline">Method — how the numbers were produced.</span>
+    <nav class="pages">
+      <a href="/">Instrument</a>
+      <a href="/method.html" aria-current="page">Method</a>
+      <a href="/bench.html">Bench</a>
+    </nav>
+  </header>
+
+  <!-- ------------------------------------------------------------- SLOs -->
+  <section class="panel">
+    <div class="panel-label">What the latency numbers mean</div>
+    <p>The deployment is US-hosted. A browser in Gujarat sits ~250ms of Pacific round-trip away
+    before any work happens — so "answer visible in under 200ms" measured from an Indian laptop is
+    impossible for <em>any</em> system. A system claiming it is measuring localhost, or lying.</p>
+    <p>Three numbers are published. None is hidden inside another.</p>
+    <div class="scroll-x">
+      <table class="data">
+        <thead><tr><th>Number</th><th>Measures</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr><td><b>server_side_ms</b></td><td>full request handling, network excluded — <b>the headline SLO</b></td><td>server's monotonic clock, <code>X-Server-Time-Ms</code></td></tr>
+          <tr><td>pipeline_ms</td><td>retrieval-to-answer stages, framework overhead excluded</td><td><code>RequestTimer</code> spans in the response body</td></tr>
+          <tr><td>client_observed_ms</td><td>what a caller at that location actually waited</td><td>benchmark harness wall clock</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>To keep the headline honest, the benchmark also runs from a <b>US GitHub Actions runner</b>,
+    co-located with the deployment — real deployed system, real HTTP, just not across an ocean.
+    The India→US distribution is published separately with the network delta as its own series.</p>
+  </section>
+
+  <!-- --------------------------------------------------------- two tiers -->
+  <section class="panel">
+    <div class="panel-label">Why the answer arrives in two tiers</div>
+    <p>Measured time-to-first-token from the generation providers:</p>
+    <div class="scroll-x">
+      <table class="data">
+        <thead><tr><th>Provider</th><th>Model</th><th class="num">TTFT</th></tr></thead>
+        <tbody>
+          <tr><td>Groq</td><td>llama-3.3-70b-versatile</td><td class="num">477 ms</td></tr>
+          <tr><td>Groq</td><td>openai/gpt-oss-20b</td><td class="num">562 ms</td></tr>
+          <tr><td>Groq</td><td>llama-3.1-8b-instant</td><td class="num">1573 ms</td></tr>
+          <tr><td>Cerebras</td><td>—</td><td class="num">HTTP 402</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><b>Every one is multiples of the entire 200ms budget.</b> Retrieve-then-generate cannot meet
+    this target regardless of retrieval speed — that is arithmetic, not tuning. So Tier 1 is
+    extractive: answer sentences copied verbatim from retrieved passages, grounded by construction,
+    single-digit milliseconds. Tier 2 streams in afterwards and is discarded if it fails the
+    grounding check.</p>
+  </section>
+
+  <!-- ----------------------------------------------------- chunking lab -->
+  <section class="panel">
+    <div class="panel-label">Chunking Lab — measured, not asserted</div>
+    <p>Six strategies scored with real IR metrics against the dataset's <code>is_selected</code>
+    relevance labels. Sampling is by <em>query</em>, so every sampled query's relevant passages are
+    guaranteed present; chunks are collapsed to parent passages before scoring so a sentence-level
+    index and a passage-level one are compared on the same footing.</p>
+    <div class="scroll-x"><div id="lab">loading…</div></div>
+  </section>
+
+  <!-- --------------------------------------------------------- corpus -->
+  <section class="panel">
+    <div class="panel-label">Corpus</div>
+    <div class="scroll-x"><div id="manifest">loading…</div></div>
+  </section>
+
+  <!-- ------------------------------------------------------- guardrails -->
+  <section class="panel">
+    <div class="panel-label">Guardrails</div>
+    <div class="scroll-x">
+      <table class="data">
+        <thead><tr><th>Gate</th><th>Mechanism</th></tr></thead>
+        <tbody>
+          <tr><td><b>scope</b></td><td>threshold τ on the top <b>dense cosine</b> — not the fused RRF score, which is rank-derived and has no stable cross-query meaning. Until calibrated it reports itself uncalibrated rather than applying a guessed number.</td></tr>
+          <tr><td><b>safety</b></td><td>pattern screen on the transcript, before retrieval, so a refusal costs nothing</td></tr>
+          <tr><td><b>grounding</b></td><td>Tier 1 grounded by construction; Tier 2 verified by token containment against cited passages — not an LLM judge, which would add a round-trip and another chance to be wrong</td></tr>
+          <tr><td><b>injection</b></td><td>passages wrapped as data, never interpolated as instructions; instruction-like passages flagged inline</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="status-strip" id="status"></div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+function table(headers, rows) {
+  const th = headers.map((h) => `<th>${h}</th>`).join("");
+  const tr = rows
+    .map((r) => "<tr>" + r.map((c, i) => `<td class="${i ? "num" : ""}">${c}</td>`).join("") + "</tr>")
+    .join("");
+  return `<table class="data"><thead><tr>${th}</tr></thead><tbody>${tr}</tbody></table>`;
+}
+
+fetch("/results/chunking_lab.json")
+  .then((r) => (r.ok ? r.json() : Promise.reject(new Error("not run yet"))))
+  .then((d) => {
+    const keys = Object.keys(d.results[0]);
+    $("lab").innerHTML =
+      table(keys, d.results.map((r) => keys.map((k) => r[k]))) +
+      `<div class="score-nums">${d.eval_queries} eval queries · ${d.indexed_passages.toLocaleString()} passages · langs ${d.languages.join(" ")}</div>`;
+  })
+  .catch((e) => {
+    $("lab").innerHTML = `<span class="score-nums">Chunking lab has not been run yet (${e.message}). Run <code>python lab/chunking_eval.py</code>.</span>`;
+  });
+
+fetch("/api/manifest")
+  .then((r) => r.json())
+  .then((m) => {
+    const per = (m.stats && m.stats.per_lang_kept) || {};
+    const rows = Object.entries(per).map(([k, v]) => [k, v.toLocaleString()]);
+    rows.push(["<b>total</b>", `<b>${(m.stats ? m.stats.passages_kept : 0).toLocaleString()}</b>`]);
+    $("manifest").innerHTML =
+      table(["Language", "Passages"], rows) +
+      `<div class="score-nums">source ${m.source_dataset} · split ${m.split} · sampled 1-in-${m.sample_1_in} by hashed query_id · dedupe ${
+        m.stats ? ((100 * m.stats.passages_deduped) / m.stats.passages_seen).toFixed(1) : "—"
+      }% · degenerate passages filtered ${m.stats ? m.stats.passages_degenerate : "—"}</div>`;
+  })
+  .catch(() => ($("manifest").textContent = "manifest unavailable"));
+</script>
+</body>
+</html>

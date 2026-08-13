@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  secrets:
+    name: secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Runs first and independently of everything else. A leaked key is the one CI failure that
+      # cannot be fixed by a follow-up commit — once it is in git history it must be rotated.
+      - name: Scan tracked files for credential patterns
+        run: |
+          set -o pipefail
+          patterns='(sk_[a-z0-9_]{16,}|csk-[a-z0-9]{32,}|gsk_[A-Za-z0-9]{40,}|hf_[A-Za-z0-9]{30,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----)'
+          # .env.example is a template of empty keys and is expected to mention the names.
+          if git grep -nIE "$patterns" -- . ':!.env.example' ':!.github/workflows/ci.yml'; then
+            echo "::error::Credential-shaped string found in tracked files."
+            exit 1
+          fi
+          echo "No credential patterns found."
+
+      - name: Ensure .env is not tracked
+        run: |
+          if git ls-files --error-unmatch .env 2>/dev/null; then
+            echo "::error::.env is tracked by git."
+            exit 1
+          fi
+          echo ".env is not tracked."
+
+  lint:
+    name: lint + types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e '.[dev]'
+      - name: Ruff
+        run: ruff check app scripts lab bench
+      - name: Ruff format check
+        run: ruff format --check app scripts lab bench
+        continue-on-error: true
+      - name: Import check
+        # Catches broken imports without needing corpus artifacts present in CI.
+        run: python -c "import app.pipeline, app.main, app.corpus, app.stages.answer, app.stages.generate"

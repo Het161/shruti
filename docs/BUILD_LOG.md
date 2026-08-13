@@ -176,6 +176,98 @@ impression of it.
 - `scripts/build_corpus.py`, `scripts/embed_corpus.py` — both validated against live data
 - `Dockerfile` — 3.13-slim, weights and artifacts baked at build time
 
+---
+
+## D1 (continued) — full corpus, and two performance defects found by measuring
+
+### The validation split is 10x larger than projected
+
+The first full build reported `hi: 97,941 queries, 1,901,146 passages` from a single shard. The
+earlier projection of ~10k queries per language was wrong by an order of magnitude — four languages
+would have produced ~4.75M passages, ~4.9 GB of float32 embeddings, a multi-gigabyte HNSW graph,
+and exact search in the 50–100ms range. It would also have filled the remaining 11 GB of disk.
+
+Killed mid-build and replaced "take the first N rows" with **hash-based subsampling on
+`query_id`**. Two properties matter and neither comes free with truncation:
+
+- *Unbiased* — parquet row order may correlate with id, source, or collection date.
+- *Identical across languages* — the hash depends only on `query_id`, which is stable across
+  shards, so every language contributes translations of the same queries.
+
+Result at 1-in-16: **310,582 passages**, five languages, ~62k each. The **37.9% dedupe rate** is
+the proof the second property held — the English passages repeated in all four shards collapsed to
+one copy, so each additional language added ~62k rather than ~124k.
+
+### Defect 1: model2vec's multiprocessing is a 35x pessimisation here
+
+Embedding 310k passages did not finish in 13 minutes. Diagnosis: `StaticModel.encode` defaults to
+`use_multiprocessing=True` above 10,000 inputs. On macOS the start method is spawn, so each of the
+8–10 workers re-imported the module and materialised its own slice. On an 8 GB machine this drove
+**swap to 8.8 GB of 10.2 GB**, load average to 28, and left workers at ~16% CPU thrashing on
+page-ins.
+
+Single-process, the same job takes **22.2 seconds** (14,022 passages/s). This is a
+memory-bandwidth-bound lookup — more processes only multiply the working set. Fixed by passing
+`use_multiprocessing=False` and encoding in logged slices, so a long run reports progress instead
+of being indistinguishable from a hang.
+
+### Defect 2: memory-mapping the embedding matrix wrecked the tail
+
+First full-corpus measurement, 300 queries after 20 warmup:
+
+| mode | P50 | P70 | P100 |
+|---|---|---|---|
+| hnsw | 5.03 | 6.45 | **138.4** |
+| exact | 8.88 | 9.20 | **1736.1** |
+
+P50 was excellent and P100 was catastrophic — a 260x spread in exact mode. Every outlier was a
+**first-touch page fault** against the memory-mapped 318 MB embedding file: `dense` P50 6.6ms
+against P100 1,728ms. A 20-query warmup cannot fault in a matrix that size, and page-cache pages
+can be evicted afterwards, so the outliers would have kept returning under memory pressure.
+
+Fixed by loading the embedding matrix and the HNSW graph into RAM rather than mapping them
+(`np.load` without `mmap_mode`, `usearch` `load()` rather than `view()`). 318 MB resident is
+affordable; a 1.7-second P100 is not.
+
+| mode | P50 | P70 | P100 | tail improvement |
+|---|---|---|---|---|
+| hnsw | 4.94 | 5.83 | **15.29** | 9x |
+| exact | 9.63 | 10.26 | **27.24** | 64x |
+
+Both modes now sit far inside the 200ms P100 target, and the distribution is flat rather than
+long-tailed. This is the single most valuable measurement taken so far: the naive reading of the
+first table would have been "we meet P50, tighten the tail later", when in fact the tail was a
+one-line configuration defect, not a tuning problem.
+
+### External providers — verified, not assumed
+
+| provider | result |
+|---|---|
+| Groq `llama-3.3-70b-versatile` | works, TTFT **477ms** |
+| Groq `openai/gpt-oss-20b` | works, TTFT **562ms** |
+| Groq `llama-3.1-8b-instant` | works, TTFT 1573ms (cold) |
+| Cerebras | **HTTP 402** — free quota unavailable on this account |
+| Sarvam Saaras v3 | handshake + auth confirmed live |
+| HF Docker Space | **HTTP 402** — Docker Spaces now require PRO; only Static Spaces are free |
+
+Two things fell out of this:
+
+- `llama-3.1-8b` no longer exists on Cerebras at all (their catalogue is now `zai-glm-4.7`,
+  `gemma-4-31b`, `gpt-oss-120b`), so the originally specified default model was unavailable
+  regardless of billing.
+- Groq sits behind Cloudflare, which rejects `urllib`'s default user-agent with a **403 error 1010**
+  that reads exactly like an auth failure. `httpx` passes. An explicit User-Agent is now set so this
+  cannot silently regress.
+
+**Every measured TTFT is 2.5–8x the entire 200ms budget.** That is the empirical justification for
+the two-tier design, and it is worth stating as a finding rather than a design preference:
+retrieve-then-generate cannot meet this target by arithmetic, no matter how fast retrieval is.
+
+### Deployment target changed
+
+HF Docker Spaces are no longer free. Moved to **Google Cloud Run** — real vCPUs, US region, free at
+this traffic volume, and it runs the same Dockerfile unmodified.
+
 ### Bugs found and fixed during validation
 
 - `split_sentences` folded a trailing fragment with `merged[-2] = f"... {merged.pop()}"`. The pop

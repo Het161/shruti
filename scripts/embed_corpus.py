@@ -96,7 +96,22 @@ def main() -> int:
     embedder = get_embedder(args.lane)
     log.info("embedding with lane=%s dim=%d", embedder.lane, embedder.dim)
     t0 = time.perf_counter()
-    vectors = embedder.encode_batch(texts, batch_size=args.batch_size)
+
+    # Encoded in slices with progress logging rather than one opaque call. Two reasons, both
+    # learned the hard way on an 8 GB machine: peak memory stays bounded by one slice's
+    # intermediates instead of the whole corpus, and a long run reports progress instead of
+    # looking identical to a hang for thirteen minutes.
+    vectors = np.empty((len(texts), embedder.dim), dtype=np.float32)
+    slice_size = max(args.batch_size, 20_000)
+    for start in range(0, len(texts), slice_size):
+        chunk = texts[start : start + slice_size]
+        vectors[start : start + len(chunk)] = embedder.encode_batch(
+            chunk, batch_size=args.batch_size
+        )
+        done = start + len(chunk)
+        rate = done / max(1e-9, time.perf_counter() - t0)
+        log.info("  embedded %d/%d (%.0f/s)", done, len(texts), rate)
+
     embed_s = time.perf_counter() - t0
     log.info(
         "embedded %d passages in %.1fs (%.0f passages/s)", len(texts), embed_s, len(texts) / embed_s

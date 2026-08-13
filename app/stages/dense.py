@@ -78,8 +78,12 @@ class DenseIndex:
         if not path.exists():
             raise StageError("dense", ErrorKind.INDEX_ERROR, f"missing HNSW index at {path}")
         index = Index(ndim=dim, metric="ip", dtype="f32")
-        # view() memory-maps rather than copying: startup stays fast and the pages are shared.
-        index.view(str(path))
+        # load() reads the graph into RAM; view() would memory-map it. Same reasoning as the
+        # embedding matrix in corpus.py: HNSW traversal jumps across the graph, so a mapped index
+        # takes page faults at unpredictable points and produces exactly the tail outliers this
+        # system exists to avoid. Startup pays a few hundred milliseconds once; every query after
+        # it is deterministic.
+        index.load(str(path))
         return cls(index, dim, n_vectors)
 
     def search(

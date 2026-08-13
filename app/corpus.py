@@ -142,9 +142,19 @@ class Corpus:
         manifest = json.loads(manifest_path.read_text())
         table = pq.read_table(passages_path)
 
-        # mmap_mode keeps the matrix backed by the page cache instead of copying it into the heap;
-        # warmup then faults in the pages that queries actually touch.
-        embeddings = np.load(emb_path, mmap_mode="r")
+        # Loaded into RAM, deliberately NOT memory-mapped.
+        #
+        # Memory-mapping looks like the frugal choice and measured catastrophically at the tail. On
+        # the 310k-passage corpus, `dense` showed P50 1.0ms against P100 131ms in HNSW mode, and
+        # P50 6.6ms against P100 1,728ms in exact mode — every outlier a first-touch page fault
+        # pulling part of a 318 MB file off disk mid-query. A 20-query warmup cannot fault in a
+        # matrix that size, and page-cache pages can be evicted afterwards anyway, so the outliers
+        # would keep coming back under memory pressure.
+        #
+        # 318 MB of resident anonymous memory is entirely affordable here, and it converts a
+        # long-tailed latency distribution into a flat one. Tail latency is the product; paying
+        # RAM to remove a 1.7-second P100 is not a close call.
+        embeddings = np.load(emb_path)
 
         n_rows = table.num_rows
         if embeddings.shape[0] != n_rows:

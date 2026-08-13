@@ -1,4 +1,9 @@
-# SHRUTI — Hugging Face Space (Docker SDK, free CPU tier)
+# SHRUTI — container image for Google Cloud Run.
+#
+# Originally targeted a Hugging Face Docker Space. That target died on contact with reality:
+# HF now returns 402 for Docker Spaces on cpu-basic ("requires a PRO subscription"), so only
+# Static Spaces remain free. Cloud Run replaces it — real vCPUs, US region, free at this traffic
+# volume, and it runs this same Dockerfile unmodified.
 #
 # Two properties this image is built for:
 #
@@ -69,15 +74,16 @@ COPY --chown=user web/ ./web/
 RUN mkdir -p /app/artifacts && chown -R user:user /app
 
 USER user
-EXPOSE 7860
 
-# Reports unhealthy until warmup finishes, so orchestration never routes traffic to a cold
-# process. start-period is generous because loading the embedding matrix and running 20 warmup
-# queries legitimately takes time — and that time is measured and reported as cold start, not
-# hidden inside per-query latency.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=180s --retries=3 \
-    CMD curl -fsS http://localhost:7860/api/health | grep -q '"ready":true' || exit 1
+# Cloud Run injects $PORT and expects the container to listen on it. Defaulted so the image also
+# runs unchanged with a plain `docker run -p 8080:8080`.
+ENV PORT=8080
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=240s --retries=3 \
+    CMD curl -fsS "http://localhost:${PORT}/api/health" | grep -q '"ready":true' || exit 1
 
 # Single worker deliberately: the embedding matrix and indexes are per-process, so a second worker
-# would double resident memory on a 16 GB box for concurrency this service does not need.
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]
+# would double resident memory for concurrency this service does not have. Cloud Run scales by
+# adding containers, not by adding workers inside one.
+CMD exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers 1

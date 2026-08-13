@@ -72,7 +72,22 @@ class FastEmbedder:
         return _l2_normalize(vec)
 
     def encode_batch(self, texts: list[str], batch_size: int = 1024) -> np.ndarray:
-        vecs = np.asarray(self._model.encode(texts, batch_size=batch_size), dtype=np.float32)
+        """Encode many texts.
+
+        `use_multiprocessing=False` is not a default worth inheriting here. model2vec spawns
+        workers above 10,000 inputs, and on macOS (spawn, not fork) each worker re-imports the
+        module and materialises its own slice of the input list. Embedding 310k passages on an 8 GB
+        machine this way drove swap to 8.8 GB, load average to 28, and left the workers at ~16% CPU
+        thrashing on page-ins — it did not finish in 13 minutes.
+
+        Single-process throughput is ~16,000 passages/s, so the same job takes about 20 seconds.
+        The parallelism was a pessimisation, not an optimisation: this is a memory-bandwidth-bound
+        lookup, and handing it more processes only multiplies the working set.
+        """
+        vecs = np.asarray(
+            self._model.encode(texts, batch_size=batch_size, use_multiprocessing=False),
+            dtype=np.float32,
+        )
         return _l2_normalize_rows(vecs)
 
 

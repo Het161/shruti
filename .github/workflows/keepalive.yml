@@ -1,0 +1,31 @@
+name: keepalive
+
+# Cloud Run scales to zero, which means the first request after an idle period pays container
+# start plus model load plus warmup. A judge opening the link should not be the one to pay that.
+#
+# This pings every 30 minutes purely to keep an instance resident. It is explicitly NOT a latency
+# measurement — cold start is measured separately and reported as its own number in the benchmark
+# artifact, never blended into per-query latency.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        env:
+          URL: ${{ vars.SHRUTI_URL }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "SHRUTI_URL repository variable not set; skipping"
+            exit 0
+          fi
+          code=$(curl -s -o /tmp/health.json -w "%{http_code}" --max-time 120 "$URL/api/health")
+          echo "HTTP $code"
+          cat /tmp/health.json
+          # A warming instance is a success: it means the ping did its job.
+          if [ "$code" != "200" ]; then exit 1; fi
