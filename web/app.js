@@ -35,7 +35,17 @@ let health = null;
 async function loadHealth() {
   try {
     const r = await fetch("/api/health");
-    health = await r.json();
+    /* Never assume the response is JSON. A cold or scaling container returns the platform's own
+     * plain-text page, and calling r.json() on it threw "Unexpected token 'm'" — an error about
+     * the parser, not about what actually happened, which is the least useful kind. */
+    const raw = await r.text();
+    try {
+      health = JSON.parse(raw);
+    } catch {
+      $("status").innerHTML = `<span class="error">server warming up — retrying…</span>`;
+      $("status2").innerHTML = "";
+      return;
+    }
     const p = health.providers || {};
     /* Joined with an explicit separator. A bare .join("") previously rendered
      * "310,582 passageslangs bn en gu hi ta" — two facts fused into one unreadable token. */
@@ -271,18 +281,26 @@ async function ask(text) {
       /* Render the error, not the JSON envelope it arrived in. Dumping
        * {"detail":{"stage":"embed",...}} at a user communicates nothing except that something
        * broke in a way nobody anticipated. */
+      /* Read the body EXACTLY once. A Response body is a stream: calling r.json() consumes it,
+       * so a later r.text() in a catch block fails with "body stream already read" — which then
+       * masks the real error with a confusing one. Take the text first, then try to parse it. */
       let stage = "";
       let message = "";
+      const raw = await r.text().catch(() => "");
       try {
-        const d = (await r.json()).detail;
+        const d = JSON.parse(raw).detail;
         if (d && typeof d === "object") {
           stage = d.stage || "";
           message = d.message || "";
         } else {
-          message = String(d ?? "");
+          message = String(d ?? raw);
         }
       } catch {
-        message = await r.text();
+        /* Not JSON at all — e.g. the platform's own plain-text error page while a container is
+         * starting or scaling. Show something a human can act on rather than the raw page. */
+        message = r.status === 503 || /starting|scaling|modal-http/i.test(raw)
+          ? "Server is starting up (cold start takes ~15s). Try again in a moment."
+          : raw.slice(0, 300) || `HTTP ${r.status}`;
       }
       $("answer-panel").classList.remove("hidden");
       $("timing-panel").classList.add("hidden");
