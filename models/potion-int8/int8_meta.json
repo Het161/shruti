@@ -1,0 +1,10 @@
+{
+  "source_model": "minishlab/potion-multilingual-128M",
+  "scale": 0.17848516449214905,
+  "dim": 256,
+  "vocab": 500353,
+  "normalize": true,
+  "apply_zipf": null,
+  "sif_coefficient": null,
+  "quant_mean_abs_err": 0.044616829603910446
+}

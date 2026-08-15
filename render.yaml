@@ -1,0 +1,38 @@
+# Render Blueprint — free tier, no credit card required.
+#
+# Deploy: Render dashboard -> New -> Blueprint -> connect github.com/Het161/shruti
+# Then set the three secrets in the dashboard (they are marked sync:false so they are never
+# committed to git).
+
+services:
+  - type: web
+    name: shruti
+    runtime: docker
+    plan: free
+    region: oregon           # US — keeps the benchmark comparable to the US-runner numbers
+    dockerfilePath: ./deploy/render/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Exact search, not HNSW: the usearch graph is 347 MB and the whole tier is 512 MB.
+      # At this corpus size exact search is a single chunked matmul, and it was already the
+      # ground truth the approximate index got measured against.
+      - key: SHRUTI_SEARCH_MODE
+        value: exact
+      - key: SHRUTI_EMBED_LANE
+        value: fast
+      # Halved from 20. Warmup is real work, and on 0.1 CPU it lengthens every cold start —
+      # which on a tier that sleeps after 15 minutes of inactivity happens often.
+      - key: SHRUTI_WARMUP_QUERIES
+        value: "10"
+      # Reranking is off and cannot be enabled here: onnxruntime is not installed in this image
+      # and there is no memory budget for it.
+      - key: SHRUTI_RERANK
+        value: "false"
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: CEREBRAS_API_KEY
+        sync: false

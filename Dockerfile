@@ -59,17 +59,37 @@ snapshot_download('minishlab/potion-multilingual-128M', \
 # Build with:  --build-arg ARTIFACT_REPO=<user>/shruti-artifacts
 ARG ARTIFACT_REPO=""
 ARG HF_TOKEN=""
+ENV R=${ARTIFACT_REPO} T=${HF_TOKEN}
+
+# Only the float32 source artifacts are fetched. The int8 variants on the same repo exist for the
+# memory-constrained Render experiment and would otherwise be pulled for nothing.
 RUN if [ -n "$ARTIFACT_REPO" ]; then \
         python -c "\
 import os; from huggingface_hub import snapshot_download; \
 snapshot_download(os.environ['R'], repo_type='dataset', local_dir='/app/artifacts', \
-    token=os.environ.get('T') or None)" ; \
+    token=os.environ.get('T') or None, \
+    allow_patterns=['passages.parquet','queries.parquet','qrels.parquet','embeddings.npy','manifest.json','bm25/*'])" ; \
     else echo 'no ARTIFACT_REPO given; artifacts must be mounted at /app/artifacts'; fi
-ENV R=${ARTIFACT_REPO} T=${HF_TOKEN}
 
 # --- application ------------------------------------------------------------------------
 COPY --chown=user app/ ./app/
 COPY --chown=user web/ ./web/
+COPY --chown=user bench/results/ ./bench/results/
+
+# Build the HNSW graph at image-build time if the artifact repo did not supply one.
+#
+# It is ~347 MB of derived data — too slow to upload from a 3 MB/s link, and it must not be built
+# at container *start* because Cloud Run counts that against the startup probe and would kill the
+# revision before it ever serves. Building it here costs ~90s once per image and makes cold starts
+# a pure memory-map. Without this the app silently falls back to exact search: correct, but ~7ms
+# per query instead of ~1.5ms, and "silently slower" is the kind of regression nobody notices.
+RUN if [ -f /app/artifacts/embeddings.npy ] && [ ! -f /app/artifacts/hnsw.usearch ]; then \
+      python -c "\
+import numpy as np, time; from app.stages.dense import DenseIndex; \
+t=time.perf_counter(); \
+DenseIndex.build(np.load('/app/artifacts/embeddings.npy')).save('/app/artifacts/hnsw.usearch'); \
+print(f'HNSW built in {time.perf_counter()-t:.1f}s')" ; \
+    fi
 
 RUN mkdir -p /app/artifacts && chown -R user:user /app
 

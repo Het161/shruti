@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import threading
+from pathlib import Path
 from typing import Protocol
 
 import numpy as np
@@ -219,7 +220,19 @@ def get_embedder(lane: str) -> Embedder:
         if hit is not None:
             return hit
         if lane == "fast":
-            emb: Embedder = FastEmbedder()
+            # A local int8 table, when one is present, is preferred over downloading the float32
+            # model. Measured, the float32 lookup table IS this service's memory cost — 512 MB of
+            # weights against under 40 MB for a 58k corpus and its BM25 index — so on a
+            # memory-constrained tier this is the difference between running and being OOM-killed.
+            import os
+
+            int8_dir = os.environ.get("SHRUTI_INT8_MODEL")
+            if int8_dir and Path(int8_dir).exists():
+                from app.stages.embed_int8 import Int8StaticEmbedder
+
+                emb: Embedder = Int8StaticEmbedder(int8_dir)
+            else:
+                emb = FastEmbedder()
         elif lane == "quality":
             emb = QualityEmbedder()
         else:
