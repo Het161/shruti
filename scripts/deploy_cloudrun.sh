@@ -64,7 +64,6 @@ gcloud run deploy "${SERVICE}" \
   --max-instances 2 \
   --min-instances 0 \
   --port 8080 \
-  --build-arg-file /dev/null \
   --set-env-vars "SHRUTI_ARTIFACT_DIR=/app/artifacts,SHRUTI_EMBED_LANE=fast,SHRUTI_SEARCH_MODE=hnsw,SHRUTI_WARMUP_QUERIES=20,SARVAM_API_KEY=${SARVAM_API_KEY:-},CEREBRAS_API_KEY=${CEREBRAS_API_KEY:-},GROQ_API_KEY=${GROQ_API_KEY:-}"
 
 URL="$(gcloud run services describe "${SERVICE}" --project "${PROJECT}" --region "${REGION}" --format='value(status.url)')"

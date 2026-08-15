@@ -57,7 +57,10 @@ snapshot_download('minishlab/potion-multilingual-128M', \
 # Produced offline by scripts/build_corpus.py + scripts/embed_corpus.py and committed to a
 # separate HF dataset repo — never to git, where half a gigabyte of embeddings does not belong.
 # Build with:  --build-arg ARTIFACT_REPO=<user>/shruti-artifacts
-ARG ARTIFACT_REPO=""
+# Defaulted rather than required. `gcloud run deploy --source` builds through Cloud Build, where
+# passing a Docker ARG means threading substitutions through a build config — avoidable complexity
+# for a value that only ever has one setting. The repo is public, so no token is needed either.
+ARG ARTIFACT_REPO="Het0812/shruti-artifacts"
 ARG HF_TOKEN=""
 ENV R=${ARTIFACT_REPO} T=${HF_TOKEN}
 
