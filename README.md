@@ -7,6 +7,10 @@
 </p>
 
 <p align="center">
+  <a href="https://eklavyajhaai07--shruti-fastapi-app.modal.run"><img src="https://img.shields.io/badge/▶_LIVE_DEMO-eklavyajhaai07--shruti--fastapi--app.modal.run-22d3ee?style=for-the-badge&labelColor=070a14" /></a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/pipeline_P100-111_ms-4ade80?style=flat-square&labelColor=070a14" />
   <img src="https://img.shields.io/badge/pipeline_P50-19_ms-4ade80?style=flat-square&labelColor=070a14" />
   <img src="https://img.shields.io/badge/corpus-310,582_passages-22d3ee?style=flat-square&labelColor=070a14" />
