@@ -283,7 +283,7 @@ this traffic volume, and it runs the same Dockerfile unmodified.
 
 ## D1 (end) — deployed, benchmarked from two continents
 
-**Live: https://hetpatelsk--shruti-fastapi-app.modal.run**
+**Live: https://eklavyajhaai07--shruti-fastapi-app.modal.run**
 
 ### Host, third attempt
 
