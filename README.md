@@ -445,3 +445,36 @@ fabricating on *"what is injection, ciprofloxacin for intravenous infusion"* aga
 reading *"ASPEN CIPROFLOXACIN Injection for Intravenous Infusion contains ciprofloxacin as the
 active ingredient."* That is a label artefact, not a hallucination. It still counts, and we still
 report it.
+
+---
+
+## A known failure, found by speaking to it
+
+Voice testing turned up a real false-confidence case, and it is worth showing rather than hiding.
+
+Asked, in Hindi, **"सिंथेसिस का क्या मतलब होता है?"** ("what does *synthesis* mean?"), SHRUTI answers
+about **hepatitis C and liver cirrhosis** — confidently, at retrieval score `0.618` against the
+`0.450` floor. The abstention gate does not fire, because by its own measure the retrieval is good.
+
+The cause is the embedder, and it is measurable:
+
+| cosine to `सिंथेसिस` | |
+|---|---:|
+| `सिरोसिस` — cirrhosis, the wrong answer | **+0.777** |
+| `थेसिस` — a bare orthographic suffix | **+0.803** |
+| `सिस` — a bare orthographic suffix | +0.771 |
+| `संश्लेषण` — the actual Hindi word for synthesis | +0.366 |
+| `synthesis` — the English word | +0.206 |
+
+`potion-multilingual-128M` is a **static** Model2Vec lookup: a bag of subword vectors with no
+context. A rare transliterated loanword like सिंथेसिस has no entry of its own, so its embedding
+collapses onto its spelling — and `सिरोसिस` happens to end the same way. The model is closer to a
+meaningless suffix (`+0.803`) than to the word's actual meaning (`+0.366`).
+
+This is the cost of the architecture we chose, stated plainly: static embeddings are what make a
+0.38 ms embed step and a 19 ms end-to-end answer possible, and this is what they buy it with. A
+contextual encoder would not make this mistake. It also could not answer in 19 ms.
+
+We are not patching the threshold to hide it. Raising the floor past `0.618` would refuse a large
+share of legitimate questions to suppress one class of error, and the calibration behind `τ=0.45`
+([lab/calibrate_scope.py](lab/calibrate_scope.py)) is what says so.

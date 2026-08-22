@@ -263,6 +263,21 @@ async function ask(text) {
   $("go").disabled = true;
   setLamp("idle", "measuring…");
 
+  /* Clear the previous result before the new one is in flight.
+   *
+   * Without this, the panels keep rendering the LAST query's answer, badges and passages while the
+   * lamp already reads "measuring…" for the new one — so for the ~400ms round trip the screen shows
+   * a new question sitting directly above an old, unrelated answer. That is not a cosmetic nit: the
+   * one thing this UI claims is that what you see is what this query produced. Showing a stale
+   * answer under a fresh question is the interface telling a small lie, and it is most visible on
+   * exactly the queries that matter most — a refusal, which renders no answer of its own and so
+   * leaves the previous one standing untouched. */
+  $("answer").textContent = "";
+  $("badges").innerHTML = "";
+  $("passages").innerHTML = "";
+  $("refusal").classList.add("hidden");
+  $("passages-panel").classList.add("hidden");
+
   try {
     const clientT0 = performance.now();
     const r = await fetch("/api/ask", {
