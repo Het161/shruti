@@ -1,0 +1,30 @@
+# Dependencies for running SHRUTI's target modules (app/embedder.py, app/generator.py).
+#
+# Exists alongside pyproject.toml specifically because the evaluation runbook installs
+# `requirements.txt` into its own virtualenv. Kept in sync with pyproject's [project.dependencies].
+#
+# onnxruntime and tokenizers are NOT optional here: app/generator.py's grounding gate uses the
+# cross-encoder, and without them the gate degrades to a weaker signal.
+
+fastapi>=0.115
+uvicorn[standard]>=0.32
+pydantic>=2.9
+pydantic-settings>=2.6
+orjson>=3.10
+
+# retrieval — all in-process, zero network calls in the hot path
+model2vec>=0.4
+bm25s>=0.2
+PyStemmer>=2.2
+usearch>=2.16
+numpy>=1.26,<3
+pyarrow>=17
+huggingface-hub>=0.26
+
+# cross-encoder grounding gate + quality lane
+onnxruntime>=1.19
+tokenizers>=0.20
+
+# providers (Tier 2 only; the extractive Tier 1 path never calls them)
+httpx>=0.27
+websockets>=13

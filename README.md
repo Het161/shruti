@@ -393,3 +393,55 @@ out-of-domain well; questions about *current world state* remain the known gap.
 <p align="center">
   <img src="https://capsule-render.vercel.app/api?type=waving&color=0:22d3ee,50:0e7c86,100:070a14&height=110&section=footer" />
 </p>
+
+---
+
+## Running `rag-local-eval-loop` against this repo
+
+This repo satisfies the suite's target contract out of the box — no config file, no HTTP shim.
+
+```bash
+export EVAL_EMBEDDER_MODULE=app.embedder      # (this is already the default)
+export EVAL_GENERATOR_MODULE=app.generator    # (already the default)
+pip install -r requirements.txt
+RAG_PROJECT_ROOT=$(pwd) python -m eval.runner --num-answerable 50 --num-unanswerable 50
+```
+
+| module | what it exposes |
+|---|---|
+| `app/embedder.py` | `embed`, `embed_one`, `get_model` — the real shipped `potion-multilingual-128M` |
+| `app/generator.py` | `generate_answer` — Tier 1 extractive, answering only from the passages the suite supplies |
+| `app/config.py` | `LATENCY_BUDGET_MS = 60` (our published SLO), model label, backend |
+
+`app/generator.py` deliberately answers from the suite's own passages rather than re-running our
+retrieval — the suite is measuring our answerer, and re-retrieving would score a different system
+than the one being asked about.
+
+### What we measured on the reliability check, before you do
+
+The first run of this suite scored **100% false confidence** — fabricating on every unanswerable
+query. That is the single worst result this project produced, and it landed squarely on the claim
+the project is built around. The fix, and the two designs it killed, are worth stating plainly:
+
+| grounding signal | AUC | outcome |
+|---|---:|---|
+| extractive score (dense + term overlap) | **~0.50** | chance. Answerable p50 `0.334`, unanswerable p50 `0.339` — the *unanswerable* queries scored higher. No threshold exists. |
+| cross-encoder on the returned sentence | 0.635 | worse than judging the passage |
+| **cross-encoder on the passage** | **0.687** | shipped, floor `0.0` |
+
+This is the **third** time in this project an embedding-similarity signal failed at deciding
+whether text *answers* a question rather than merely being *about* the topic — the scope-gate
+calibration found the same thing twice. The cross-encoder is the only signal that beat chance.
+
+Shipped result: **false confidence 46.5%, false refusal 31.0%** (n=200 each). Down from 100%, and
+still not good. Floor `+0.5` would cut fabrication to 25% but refuse half of all answerable
+queries — rejected because a false refusal costs both reliability *and* correctness, while a false
+confidence costs reliability alone (Tier 1 is extractive, so its answers stay faithful even when
+they are wrong).
+
+**A ceiling worth knowing before reading our number:** MS MARCO's "unanswerable" means no annotator
+marked a candidate as containing the answer — not that none does. This gate was charged with
+fabricating on *"what is injection, ciprofloxacin for intravenous infusion"* against a passage
+reading *"ASPEN CIPROFLOXACIN Injection for Intravenous Infusion contains ciprofloxacin as the
+active ingredient."* That is a label artefact, not a hallucination. It still counts, and we still
+report it.
